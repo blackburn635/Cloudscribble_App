@@ -1,0 +1,70 @@
+{
+  "expo": {
+    "name": "planner-scanner",
+    "slug": "planner-scanner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "jsEngine": "hermes",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1",
+            "useFrameworks": "static"
+          },
+          "android": {
+            "compileSdkVersion": 33,
+            "targetSdkVersion": 33,
+            "buildToolsVersion": "33.0.0"
+          }
+        }
+      ],
+      ["expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera.",
+          "microphonePermission": false
+        }
+      ],
+      ["expo-calendar",
+        {
+          "calendarPermission": "Allow $(PRODUCT_NAME) to access your calendar to add planner events",
+          "remindersPermission": "Allow $(PRODUCT_NAME) to access your reminders to add planner events"
+        }
+      ]
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.plannerscanner",
+      "bitcode": false,
+      "jsEngine": "hermes",
+      "buildConfiguration": "Release",
+      "infoPlist": {
+        "NSCalendarsUsageDescription": "This app needs to access your calendar to add events from your planner",
+        "NSRemindersUsageDescription": "This app needs to access your reminders to add events from your planner"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.anonymous.plannerscanner",
+      "jsEngine": "hermes",
+      "permissions": ["READ_CALENDAR", "WRITE_CALENDAR"]
+    }
+  }
+}
