@@ -102,7 +102,7 @@ export default function App() {
   };
 
   // CloudScribble Branded Button Component
-  const CloudScribbleButton = ({ title, onPress, type = 'primary', disabled = false, icon = null }) => {
+  const CloudScribbleButton = ({ title, onPress, type = 'primary', disabled = false }) => {
     const buttonColor = getButtonColor(type, disabled ? 'disabled' : 'normal');
     const textColor = type === 'primary' || type === 'success' ? TextColors.onPrimary : TextColors.onSecondary;
 
@@ -115,18 +115,9 @@ export default function App() {
         onPress={disabled ? null : onPress}
         activeOpacity={0.8}
       >
-        <View style={styles.buttonContent}>
-          {icon && (
-            <Image 
-              source={icon}
-              style={styles.buttonIcon}
-              resizeMode="contain"
-            />
-          )}
-          <Text style={[styles.cloudscribbleButtonText, { color: textColor }]}>
-            {title}
-          </Text>
-        </View>
+        <Text style={[styles.cloudscribbleButtonText, { color: textColor }]}>
+          {title}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -207,15 +198,10 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" backgroundColor={BackgroundColors.main} />
       
-      {/* Navy Header with CloudScribble Icon */}
+      {/* CloudScribble Header */}
       <View style={styles.appHeader}>
-        <View style={styles.logoPanel}>
-          <Image 
-            source={require('./assets/icons/Full_Icon_no_background.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
-        </View>
+        <Text style={styles.appTitle}>CloudScribble</Text>
+        <Text style={styles.appSubtitle}>Planner Scanner</Text>
       </View>
 
       <ScrollView style={styles.scrollContainer}>
@@ -245,16 +231,16 @@ export default function App() {
         ) : (
           <View style={styles.mainContainer}>
             <View style={styles.welcomeContainer}>
-              <Text style={styles.welcomeText}>Welcome to CloudScribble</Text>
+              <Text style={styles.welcomeText}>📱 Welcome to CloudScribble</Text>
               <Text style={styles.instructionText}>
-                Sync your Cloudscribble paper planner with your digital calendar with just a few clicks
+                Capture your beautiful handwritten planner and automatically sync events to your digital calendar
               </Text>
             </View>
             
             <View style={styles.featureContainer}>
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>📸</Text>
-                <Text style={styles.featureText}>Scan your planner page</Text>
+                <Text style={styles.featureText}>Scan any planner page</Text>
               </View>
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>🤖</Text>
@@ -262,15 +248,14 @@ export default function App() {
               </View>
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>📅</Text>
-                <Text style={styles.featureText}>Sync to the calendar of your choice</Text>
+                <Text style={styles.featureText}>Sync to your calendar</Text>
               </View>
             </View>
 
             <CloudScribbleButton 
-              title="Start Scanning"
+              title="📷 Start Scanning"
               onPress={() => setShowCamera(true)}
               type="primary"
-              icon={require('./assets/icons/Icon3.png')}
             />
           </View>
         )}
@@ -303,24 +288,33 @@ const styles = StyleSheet.create({
   },
   appHeader: {
     backgroundColor: Colors.navy,
-    paddingVertical: 15,
+    paddingVertical: 20,
     paddingHorizontal: 20,
     alignItems: 'center',
   },
-  logoPanel: {
-    backgroundColor: Colors.cream,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerLogo: {
-    width: 200,
-    height: 79,
+    width: 40,
+    height: 40,
+    marginRight: 15,
+  },
+  headerText: {
+    alignItems: 'center',
+  },
+  appTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.cream,
+    marginBottom: 2,
+  },
+  appSubtitle: {
+    fontSize: 14,
+    color: Colors.mauveLight,
+    fontWeight: '500',
   },
   scrollContainer: {
     flex: 1,
@@ -521,19 +515,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  buttonContent: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  },
-  buttonIcon: {
-    width: 40,
-    height: 40,
-    marginRight: 8,
-  },
   cloudscribbleButtonText: {
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
   },
-}); 
+});
