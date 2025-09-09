@@ -32,12 +32,20 @@ export class PlannerTextProcessor {
       console.log('Starting page processing with QR support (single transaction)');
       
       // Step 1: Process OCR (single API call)
-      const ocrResult = await this.azureClient.processImage(this.imageUri);
-      if (!ocrResult || !ocrResult.blocks) {
+      const ocrResult = await this.azureClient.recognizeText(this.imageUri);
+
+      //Debugging code
+      console.log('OCR Result structure:', JSON.stringify(ocrResult, null, 2));
+      console.log('OCR Result keys:', Object.keys(ocrResult || {}));
+      console.log('Success:', ocrResult?.success);
+      console.log('Data length:', ocrResult?.data?.length);
+      console.log('Blocks present:', !!ocrResult?.blocks);
+
+      if (!ocrResult || !ocrResult.success || !ocrResult.data) {
         throw new Error('OCR processing failed or returned no data');
       }
 
-      console.log('OCR processing complete, found', ocrResult.blocks.length, 'text blocks');
+      console.log('OCR processing complete, found', ocrResult.data.length, 'text blocks');
 
       // Step 2: Extract QR code from existing OCR results (NO ADDITIONAL API CALL)
       this.qrData = this.qrDecoder.processQRFromOCRResults(ocrResult, this.screenWidth);
@@ -87,7 +95,7 @@ export class PlannerTextProcessor {
     console.log('Processing with template for', daysOnPage, 'days:', pagedays.map(d => d.dayName));
 
     // Create sections based on QR template data
-    const pageHeight = ocrResult.blocks.reduce((max, block) => 
+    const pageHeight = ocrResult.data.reduce((max, block) => 
       Math.max(max, block.bounding?.bottom || 0), 0);
     
     // Divide page into equal sections for each day
@@ -112,7 +120,7 @@ export class PlannerTextProcessor {
     }
 
     // Process events using template-aware logic
-    await this.processEventsWithTemplate(ocrResult.blocks);
+    await this.processEventsWithTemplate(ocrResult.data);
   }
 
   /**
@@ -121,8 +129,7 @@ export class PlannerTextProcessor {
   async processFallback(ocrResult) {
     console.log('Using fallback processing (original method)');
     
-    // Filter out QR code blocks from processing
-    const relevantBlocks = ocrResult.blocks.filter(block => 
+    const relevantBlocks = ocrResult.data.filter(block => 
       !this.isQRCodeBlock(block)
     );
 
@@ -130,18 +137,32 @@ export class PlannerTextProcessor {
       .filter(block => block.text && block.bounding)
       .sort((a, b) => a.bounding.top - b.bounding.top);
 
+    // Parse year from any date block
+    let currentYear = new Date().getFullYear();
+    let currentMonth = null;
+
+    for (const block of sortedBlocks) {
+      const parsedDate = this.parseDateFromText(block.text);
+      if (parsedDate) {
+        currentYear = parsedDate.year;
+        if (!currentMonth) currentMonth = parsedDate.monthName;
+      }
+    }
+
     // Create sections based on detected day headers
     const dayPattern = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i;
     
     for (const block of sortedBlocks) {
       const dayMatch = block.text.match(dayPattern);
       if (dayMatch) {
-        const dayName = dayMatch[1];
+        const parsedDate = this.parseDateFromText(block.text);
         
         const section = {
-          day: dayName,
-          shortDay: dayName.substring(0, 3),
-          date: null,
+          day: dayMatch[1],
+          shortDay: dayMatch[1].substring(0, 3),
+          month: parsedDate ? parsedDate.monthName : currentMonth,
+          date: parsedDate ? parsedDate.date : null,
+          year: currentYear,
           events: [],
           topPosition: block.bounding.top,
           confidence: block.confidence || 0.8
@@ -150,6 +171,11 @@ export class PlannerTextProcessor {
         this.recognized.sections.push(section);
       }
     }
+
+    // Add metadata
+    this.recognized.year = currentYear;
+    this.recognized.metadata.year = currentYear;
+    this.recognized.metadata.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     // Process events using original logic
     await this.processEventsOriginal(sortedBlocks);
@@ -378,6 +404,23 @@ export class PlannerTextProcessor {
   }
 
   /**
+   * Parse date from text like "Friday January 10, 2025"
+   */
+  parseDateFromText(text) {
+    const dateMatch = text.match(/(\w+day)\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
+    if (dateMatch) {
+      const [_, dayName, monthName, date, year] = dateMatch;
+      return {
+        dayName: dayName,
+        monthName: monthName,
+        date: parseInt(date),
+        year: parseInt(year)
+      };
+    }
+    return null;
+  }
+
+  /**
    * Find which section a text block belongs to
    */
   findSectionForBlock(block) {
@@ -446,12 +489,44 @@ export class PlannerTextProcessor {
    * Validate if extracted text is a valid event
    */
   isValidEvent(event) {
-    return event && 
-           ((event.time && !event.hasTimeRange) || (event.startTime && event.endTime)) && 
-           event.title && 
-           event.title.length > 1 && 
-           !/^things to do$/i.test(event.title) &&
-           !/^\d{11}$/.test(event.title.replace(/\s/g, ''));
+    if (!event || 
+        !((event.time && !event.hasTimeRange) || (event.startTime && event.endTime)) ||
+        !event.title) {
+      return false;
+    }
+
+    const title = event.title.trim();
+    
+    // Filter out invalid events
+    if (
+      // Too short
+      title.length <= 1 ||
+      
+      // Single letters (weekday abbreviations: F, W, T, M, S)
+      /^[A-Z]$/.test(title) ||
+      
+      // Pure numbers or number sequences (calendar dates)
+      /^\d+$/.test(title.replace(/\s/g, '')) ||
+      /^[\d\s]+$/.test(title) ||
+      
+      // Single symbols
+      /^[^\w\s]$/.test(title) ||
+      
+      // Common non-event patterns
+      /^things to do$/i.test(title) ||
+      /^\d{11}$/.test(title.replace(/\s/g, '')) || // QR codes
+      
+      // Calendar month/date patterns
+      /^(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)$/i.test(title) ||
+      /^\d{1,2}\/\d{1,2}$/.test(title) ||
+      
+      // Time-only patterns (should have description)
+      /^\d{1,2}(:\d{2})?\s*(am|pm)?$/i.test(title)
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -488,7 +563,7 @@ export class PlannerTextProcessor {
    */
   calculateConfidence() {
     if (this.recognized.sections.length === 0) {
-      this.recognized.metadata.totalConfidence = 0;
+      this.recognized.metadata.confidence = 0;
       return;
     }
 
@@ -515,11 +590,11 @@ export class PlannerTextProcessor {
       templateBonus = 0.1;
     }
     
-    this.recognized.metadata.totalConfidence = Math.min(
+    this.recognized.metadata.confidence = Math.min(
       avgEventConfidence + qrBonus + templateBonus, 
       1.0
     );
     
-    console.log('Total confidence calculated:', this.recognized.metadata.totalConfidence);
+    console.log('Total confidence calculated:', this.recognized.metadata.confidence);
   }
 }
