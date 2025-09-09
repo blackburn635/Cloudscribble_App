@@ -1,65 +1,10 @@
-// constants/Colors.ts
+// constants/Colors.js
 /**
- * CloudScribble Brand Colors for React Native (TypeScript)
+ * CloudScribble Brand Colors for React Native
  * Complete color system for consistent branding across the mobile app
  */
 
-export interface ColorPalette {
-  // Primary Brand Colors
-  navy: string;
-  mauve: string;
-  cream: string;
-  creamAlt: string;
-
-  // Secondary Brand Colors
-  gold: string;
-  goldAlt: string;
-  sage: string;
-  dustyRose: string;
-  lavender: string;
-
-  // Accent & Supporting Colors
-  softPeach: string;
-  lightBlue: string;
-  lightPurple: string;
-  warmGray: string;
-
-  // Color Variations
-  mauveLight: string;
-  roseLight: string;
-  sageLight: string;
-  goldLight: string;
-  navyLight: string;
-  navyDark: string;
-
-  // Functional Colors
-  brandBlue: string;
-  brandAccent1: string;
-  brandAccent2: string;
-  brandBackground: string;
-  paleGold: string;
-
-  // Admin Interface Colors
-  adminPrimary: string;
-  adminSecondary: string;
-  adminInfo: string;
-  adminText: string;
-  adminSecondaryText: string;
-
-  // Transparent Overlays
-  mauveOverlay: string;
-  roseOverlay: string;
-  sageOverlay: string;
-  navyOverlay: string;
-  darkOverlay: string;
-
-  // Standard Colors
-  white: string;
-  black: string;
-  transparent: string;
-}
-
-export const Colors: ColorPalette = {
+export const Colors = {
   // MARK: - Primary Brand Colors
   navy: '#283593',
   mauve: '#B995A9', 
@@ -94,14 +39,14 @@ export const Colors: ColorPalette = {
   brandBackground: '#fcfcfc',
   paleGold: '#E6D5AC',
 
-  // MARK: - Admin Interface Colors
+  // MARK: - Admin Interface Colors (if needed)
   adminPrimary: '#3947ac',
   adminSecondary: '#C8A943',
   adminInfo: '#78CBF9',
   adminText: '#2c3e50',
   adminSecondaryText: '#5a6c7d',
 
-  // MARK: - Transparent Overlays
+  // MARK: - Transparent Overlays (with alpha)
   mauveOverlay: 'rgba(185, 149, 169, 0.15)',
   roseOverlay: 'rgba(232, 180, 188, 0.15)',
   sageOverlay: 'rgba(156, 175, 136, 0.15)', 
@@ -114,50 +59,8 @@ export const Colors: ColorPalette = {
   transparent: 'transparent',
 };
 
-// MARK: - Color Group Interfaces
-export interface NavigationColorScheme {
-  background: string;
-  primary: string;
-  active: string;
-  text: string;
-  activeText: string;
-}
-
-export interface ButtonColorScheme {
-  primary: string;
-  primaryPressed: string;
-  secondary: string;
-  secondaryPressed: string;
-  success: string;
-  premium: string;
-  disabled: string;
-}
-
-export interface BackgroundColorScheme {
-  main: string;
-  card: string;
-  section: string;
-  overlay: string;
-}
-
-export interface StatusColorScheme {
-  success: string;
-  warning: string;
-  info: string;
-  error: string;
-}
-
-export interface TextColorScheme {
-  primary: string;
-  secondary: string;
-  onPrimary: string;
-  onSecondary: string;
-  disabled: string;
-  link: string;
-}
-
 // MARK: - Organized Color Groups
-export const NavigationColors: NavigationColorScheme = {
+export const NavigationColors = {
   background: Colors.creamAlt,
   primary: Colors.navy,
   active: Colors.mauve,
@@ -165,7 +68,7 @@ export const NavigationColors: NavigationColorScheme = {
   activeText: Colors.navy,
 };
 
-export const ButtonColors: ButtonColorScheme = {
+export const ButtonColors = {
   primary: Colors.lightPurple,
   primaryPressed: Colors.brandAccent2,
   secondary: Colors.mauve,
@@ -175,21 +78,21 @@ export const ButtonColors: ButtonColorScheme = {
   disabled: Colors.warmGray,
 };
 
-export const BackgroundColors: BackgroundColorScheme = {
+export const BackgroundColors = {
   main: Colors.creamAlt,
   card: Colors.brandBackground,
   section: Colors.lavender,
   overlay: Colors.darkOverlay,
 };
 
-export const StatusColors: StatusColorScheme = {
+export const StatusColors = {
   success: Colors.sage,
   warning: Colors.gold,
   info: Colors.lightBlue,
   error: Colors.dustyRose,
 };
 
-export const TextColors: TextColorScheme = {
+export const TextColors = {
   primary: Colors.navy,
   secondary: Colors.warmGray,
   onPrimary: Colors.cream,
@@ -198,14 +101,9 @@ export const TextColors: TextColorScheme = {
   link: Colors.brandBlue,
 };
 
-// MARK: - Utility Function Types
-export type ButtonType = 'primary' | 'secondary' | 'success' | 'premium';
-export type ButtonState = 'normal' | 'pressed' | 'disabled';
-export type StatusType = 'success' | 'warning' | 'info' | 'error';
-
 // MARK: - Utility Functions
-export const getButtonColor = (type: ButtonType = 'primary', state: ButtonState = 'normal'): string => {
-  const buttonMap: Record<ButtonType, Record<ButtonState, string>> = {
+export const getButtonColor = (type = 'primary', state = 'normal') => {
+  const buttonMap = {
     primary: {
       normal: ButtonColors.primary,
       pressed: ButtonColors.primaryPressed,
@@ -231,8 +129,8 @@ export const getButtonColor = (type: ButtonType = 'primary', state: ButtonState 
   return buttonMap[type]?.[state] || ButtonColors.primary;
 };
 
-export const getStatusColor = (status: StatusType): string => {
-  const statusMap: Record<StatusType, string> = {
+export const getStatusColor = (status) => {
+  const statusMap = {
     success: StatusColors.success,
     warning: StatusColors.warning,
     info: StatusColors.info,
@@ -242,22 +140,8 @@ export const getStatusColor = (status: StatusType): string => {
   return statusMap[status] || StatusColors.info;
 };
 
-// MARK: - Theme Interfaces
-export interface ThemeColors {
-  primary: string;
-  background: string;
-  card: string;
-  text: string;
-  border: string;
-  notification: string;
-}
-
-export interface Theme {
-  colors: ThemeColors;
-}
-
 // MARK: - Theme Configuration
-export const LightTheme: Theme = {
+export const LightTheme = {
   colors: {
     primary: Colors.navy,
     background: Colors.creamAlt,
@@ -268,7 +152,7 @@ export const LightTheme: Theme = {
   },
 };
 
-export const DarkTheme: Theme = {
+export const DarkTheme = {
   colors: {
     primary: Colors.mauve,
     background: Colors.navy,

@@ -1,6 +1,102 @@
+<!-- android/app/src/main/res/values/colors.xml -->
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-  <color name="splashscreen_background">#ffffff</color>
-  <color name="iconBackground">#ffffff</color>
-  <color name="colorPrimary">#023c69</color>
-  <color name="colorPrimaryDark">#ffffff</color>
+    
+    <!-- Primary Brand Colors -->
+    <color name="navy">#283593</color>
+    <color name="mauve">#B995A9</color>
+    <color name="cream">#FDF8F0</color>
+    <color name="cream_alt">#FCF8F1</color>
+    
+    <!-- Secondary Brand Colors -->
+    <color name="gold">#C8A943</color>
+    <color name="gold_alt">#D4AF37</color>
+    <color name="sage">#9CAF88</color>
+    <color name="dusty_rose">#E8B4BC</color>
+    <color name="lavender">#E6E6FA</color>
+    
+    <!-- Accent & Supporting Colors -->
+    <color name="soft_peach">#FFDFD3</color>
+    <color name="light_blue">#78CBF9</color>
+    <color name="light_purple">#6774c8</color>
+    <color name="warm_gray">#4A4B4F</color>
+    
+    <!-- Color Variations -->
+    <color name="mauve_light">#C5A7B8</color>
+    <color name="rose_light">#F2C4CB</color>
+    <color name="sage_light">#B5C7A4</color>
+    <color name="gold_light">#D4BC6C</color>
+    <color name="navy_light">#3949ab</color>
+    <color name="navy_dark">#2a3580</color>
+    
+    <!-- Functional Colors -->
+    <color name="brand_blue">#03A9F4</color>
+    <color name="brand_accent1">#6774c8</color>
+    <color name="brand_accent2">#5865bf</color>
+    <color name="brand_background">#fcfcfc</color>
+    <color name="pale_gold">#E6D5AC</color>
+    
+    <!-- Admin Interface Colors -->
+    <color name="admin_primary">#3947ac</color>
+    <color name="admin_secondary">#C8A943</color>
+    <color name="admin_info">#78CBF9</color>
+    <color name="admin_text">#2c3e50</color>
+    <color name="admin_secondary_text">#5a6c7d</color>
+    
+    <!-- Transparent Overlays -->
+    <color name="mauve_overlay">#26B995A9</color>    <!-- 15% opacity -->
+    <color name="rose_overlay">#26E8B4BC</color>     <!-- 15% opacity -->
+    <color name="sage_overlay">#269CAF88</color>     <!-- 15% opacity -->
+    <color name="navy_overlay">#CC283593</color>     <!-- 80% opacity -->
+    <color name="dark_overlay">#80000000</color>     <!-- 50% opacity -->
+    
+    <!-- Material Design System Colors -->
+    <color name="colorPrimary">@color/navy</color>
+    <color name="colorPrimaryVariant">@color/navy_dark</color>
+    <color name="colorOnPrimary">@color/cream</color>
+    <color name="colorSecondary">@color/mauve</color>
+    <color name="colorSecondaryVariant">@color/mauve_light</color>
+    <color name="colorOnSecondary">@color/navy</color>
+    <color name="colorBackground">@color/cream_alt</color>
+    <color name="colorSurface">@color/brand_background</color>
+    <color name="colorOnBackground">@color/navy</color>
+    <color name="colorOnSurface">@color/warm_gray</color>
+    <color name="colorError">@color/dusty_rose</color>
+    <color name="colorOnError">@color/navy</color>
+    
+    <!-- Navigation Colors -->
+    <color name="navigation_background">@color/cream_alt</color>
+    <color name="navigation_primary">@color/navy</color>
+    <color name="navigation_active">@color/mauve</color>
+    
+    <!-- Button Colors -->
+    <color name="button_primary">@color/light_purple</color>
+    <color name="button_primary_pressed">@color/brand_accent2</color>
+    <color name="button_secondary">@color/mauve</color>
+    <color name="button_secondary_pressed">@color/mauve_light</color>
+    <color name="button_success">@color/sage</color>
+    <color name="button_premium">@color/gold</color>
+    
+    <!-- Background Colors -->
+    <color name="background_main">@color/cream_alt</color>
+    <color name="background_card">@color/brand_background</color>
+    <color name="background_section">@color/lavender</color>
+    
+    <!-- Status Colors -->
+    <color name="status_success">@color/sage</color>
+    <color name="status_warning">@color/gold</color>
+    <color name="status_info">@color/light_blue</color>
+    <color name="status_error">@color/dusty_rose</color>
+    
+    <!-- Text Colors -->
+    <color name="text_primary">@color/navy</color>
+    <color name="text_secondary">@color/warm_gray</color>
+    <color name="text_on_primary">@color/cream</color>
+    <color name="text_on_secondary">@color/navy</color>
+    
+    <!-- Standard Android Colors (keep for compatibility) -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    
 </resources>
