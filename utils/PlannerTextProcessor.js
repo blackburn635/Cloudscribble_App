@@ -1,119 +1,219 @@
 // utils/PlannerTextProcessor.js
-import * as ImageManipulator from 'expo-image-manipulator';
-import AzureVisionClient from './AzureVisionClient';
-import TextNormalizer from './TextNormalizer';
+import { AzureVisionClient } from './AzureVisionClient';
+import { TextNormalizer } from './TextNormalizer';
+import { QRDecoder } from './QRDecoder';
+import { Dimensions } from 'react-native';
 
 export class PlannerTextProcessor {
   constructor(imageUri) {
     this.imageUri = imageUri;
+    this.azureClient = new AzureVisionClient();
     this.textNormalizer = new TextNormalizer();
-    this.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    this.blocks = [];
-    
-    // Event keywords that suggest time of day
-    this.timeKeywords = {
-      morning: ['breakfast', 'morning', 'school starts', 'class starts'],
-      afternoon: ['lunch', 'afternoon', 'school ends', 'dismissal'],
-      evening: ['dinner', 'evening', 'practice', 'workout', 'training']
-    };
+    this.qrDecoder = new QRDecoder();
+    this.screenWidth = Dimensions.get('window').width;
+    this.qrData = null;
     
     this.recognized = {
-      year: null,
       sections: [],
+      events: [],
       metadata: {
-        processedAt: new Date().toISOString(),
-        timezone: this.timezone,
-        confidence: 0
+        processingDate: new Date().toISOString(),
+        imageUri: imageUri,
+        totalConfidence: 0
       }
     };
   }
 
+  /**
+   * Main processing method - SINGLE API TRANSACTION
+   */
   async processPage() {
     try {
-      console.log('Starting page processing...');
-      const preparedImage = await this.prepareImage();
+      console.log('Starting page processing with QR support (single transaction)');
       
-      const azureClient = new AzureVisionClient();
-      const result = await azureClient.recognizeText(preparedImage.uri);
+      // Step 1: Process OCR (single API call)
+      const ocrResult = await this.azureClient.processImage(this.imageUri);
+      if (!ocrResult || !ocrResult.blocks) {
+        throw new Error('OCR processing failed or returned no data');
+      }
+
+      console.log('OCR processing complete, found', ocrResult.blocks.length, 'text blocks');
+
+      // Step 2: Extract QR code from existing OCR results (NO ADDITIONAL API CALL)
+      this.qrData = this.qrDecoder.processQRFromOCRResults(ocrResult, this.screenWidth);
       
-      if (!result.success || !result.data || !Array.isArray(result.data)) {
-        console.error('Invalid Azure Vision result:', result);
-        throw new Error('Failed to get valid text recognition results');
-      }
-
-      this.blocks = result.data;
-      console.log('Processing blocks:', this.blocks.length);
-
-      // Find year in header
-      const yearBlock = this.blocks.find(block => 
-        block.text && /^20\d{2}$/.test(block.text.trim())
-      );
-      
-      if (yearBlock) {
-        this.recognized.year = parseInt(yearBlock.text);
-      }
-
-      // Sort blocks by vertical position
-      const sortedBlocks = [...this.blocks].sort((a, b) => {
-        const aTop = a.bounding?.top || 0;
-        const bTop = b.bounding?.top || 0;
-        return aTop - bTop;
-      });
-
-      // Process sections
-      for (const block of sortedBlocks) {
-        if (!block.text) continue;
+      if (this.qrData) {
+        console.log('QR code detected in OCR results:', {
+          template: this.qrData.templateCode,
+          pageType: this.qrData.isLeftPage ? 'left' : 'right',
+          startDate: this.qrData.startDate,
+          daysOnPage: this.qrData.daysOnPage
+        });
         
-        const text = block.text.trim();
-        const dayHeaderMatch = text.match(/^(Monday|Tuesday|Wednesday),\s*(\d{1,2})\s*(January)/i);
+        // Add QR metadata
+        this.recognized.metadata.qrData = this.qrData;
+        this.recognized.metadata.templateCode = this.qrData.templateCode;
+        this.recognized.metadata.pageType = this.qrData.pageType;
+        this.recognized.metadata.startDate = this.qrData.startDate;
         
-        if (dayHeaderMatch) {
-          const section = {
-            day: dayHeaderMatch[1],
-            date: parseInt(dayHeaderMatch[2]),
-            month: dayHeaderMatch[3].toLowerCase(),
-            events: [],
-            bounds: block.bounding || null,
-            topPosition: block.bounding?.top || 0
-          };
-          console.log(`Created section: ${section.day}`, JSON.stringify(section, null, 2));
-          this.recognized.sections.push(section);
-        }
-      }
-
-      // Process events
-      for (const block of sortedBlocks) {
-        if (!block.text) continue;
-        
-        const text = block.text.trim();
-        if (!text || text.toLowerCase().includes('things to do') || 
-            /^20\d{2}$/.test(text) || 
-            /^(Monday|Tuesday|Wednesday),/.test(text)) {
-          continue;
-        }
-
-        const section = this.findSectionForBlock(block);
-        if (section) {
-          await this.processEventBlock(section, block);
-        }
-      }
-
-      // Sort and clean events
-      for (const section of this.recognized.sections) {
-        section.events = section.events
-          .filter(event => this.isValidEvent(event))
-          .sort((a, b) => this.compareEventTimes(a.startTime || a.time, b.startTime || b.time));
+        // Use QR-based template processing
+        await this.processWithTemplate(ocrResult);
+      } else {
+        console.log('No QR code found, using fallback processing');
+        await this.processFallback(ocrResult);
       }
 
       this.calculateConfidence();
-      return { success: true, data: this.recognized };
+      return { 
+        success: true, 
+        data: this.recognized,
+        qrData: this.qrData,
+        apiTransactions: 1
+      };
 
     } catch (error) {
-      console.error('Text processing failed:', error);
+      console.error('Page processing failed:', error);
       return { success: false, error: error.message };
     }
   }
 
+  /**
+   * Process with QR template information
+   */
+  async processWithTemplate(ocrResult) {
+    const { daysOnPage } = this.qrData;
+    const pagedays = this.qrDecoder.getPageDayNames(this.qrData);
+    
+    console.log('Processing with template for', daysOnPage, 'days:', pagedays.map(d => d.dayName));
+
+    // Create sections based on QR template data
+    const pageHeight = ocrResult.blocks.reduce((max, block) => 
+      Math.max(max, block.bounding?.bottom || 0), 0);
+    
+    // Divide page into equal sections for each day
+    const sectionHeight = pageHeight / daysOnPage;
+    
+    for (let i = 0; i < daysOnPage; i++) {
+      const dayInfo = pagedays[i];
+      const topPosition = i * sectionHeight;
+      const bottomPosition = (i + 1) * sectionHeight;
+      
+      const section = {
+        day: dayInfo.dayName,
+        shortDay: dayInfo.shortName,
+        date: dayInfo.date,
+        events: [],
+        topPosition,
+        bottomPosition,
+        confidence: 0.8
+      };
+      
+      this.recognized.sections.push(section);
+    }
+
+    // Process events using template-aware logic
+    await this.processEventsWithTemplate(ocrResult.blocks);
+  }
+
+  /**
+   * Fallback processing (original method)
+   */
+  async processFallback(ocrResult) {
+    console.log('Using fallback processing (original method)');
+    
+    // Filter out QR code blocks from processing
+    const relevantBlocks = ocrResult.blocks.filter(block => 
+      !this.isQRCodeBlock(block)
+    );
+
+    const sortedBlocks = relevantBlocks
+      .filter(block => block.text && block.bounding)
+      .sort((a, b) => a.bounding.top - b.bounding.top);
+
+    // Create sections based on detected day headers
+    const dayPattern = /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i;
+    
+    for (const block of sortedBlocks) {
+      const dayMatch = block.text.match(dayPattern);
+      if (dayMatch) {
+        const dayName = dayMatch[1];
+        
+        const section = {
+          day: dayName,
+          shortDay: dayName.substring(0, 3),
+          date: null,
+          events: [],
+          topPosition: block.bounding.top,
+          confidence: block.confidence || 0.8
+        };
+        
+        this.recognized.sections.push(section);
+      }
+    }
+
+    // Process events using original logic
+    await this.processEventsOriginal(sortedBlocks);
+  }
+
+  /**
+   * Process events with template information
+   */
+  async processEventsWithTemplate(blocks) {
+    const relevantBlocks = blocks.filter(block => 
+      block.text && 
+      block.bounding &&
+      !this.isQRCodeBlock(block) &&
+      !this.isHeaderBlock(block.text)
+    );
+
+    for (const block of relevantBlocks) {
+      const section = this.findSectionForBlock(block);
+      if (section) {
+        await this.processEventBlock(section, block);
+      }
+    }
+
+    // Sort events within each section
+    for (const section of this.recognized.sections) {
+      section.events = section.events
+        .filter(event => this.isValidEvent(event))
+        .sort((a, b) => this.compareEventTimes(a.startTime || a.time, b.startTime || b.time));
+    }
+  }
+
+  /**
+   * Process events using original method  
+   */
+  async processEventsOriginal(sortedBlocks) {
+    for (const block of sortedBlocks) {
+      if (!block.text) continue;
+      
+      const text = block.text.trim();
+      if (!text || 
+          text.toLowerCase().includes('things to do') || 
+          /^20\d{2}$/.test(text) || 
+          /^(Monday|Tuesday|Wednesday),/.test(text) ||
+          this.isQRCodeBlock(block)) {
+        continue;
+      }
+
+      const section = this.findSectionForBlock(block);
+      if (section) {
+        await this.processEventBlock(section, block);
+      }
+    }
+
+    // Sort and clean events
+    for (const section of this.recognized.sections) {
+      section.events = section.events
+        .filter(event => this.isValidEvent(event))
+        .sort((a, b) => this.compareEventTimes(a.startTime || a.time, b.startTime || b.time));
+    }
+  }
+
+  /**
+   * Process individual event block
+   */
   async processEventBlock(section, block) {
     try {
       const text = block.text.trim();
@@ -138,7 +238,7 @@ export class PlannerTextProcessor {
         }
       }
 
-      if (timeInfo) {
+      if (timeInfo && description) {
         const normalizedDescription = this.textNormalizer.normalizeText(description);
         console.log('Normalized description:', description, '=>', normalizedDescription);
 
@@ -155,6 +255,12 @@ export class PlannerTextProcessor {
                 }
               : { time: timeInfo.time })
           };
+          
+          // Add date information if available from template
+          if (section.date) {
+            event.date = section.date;
+          }
+          
           section.events.push(event);
           console.log('Added event:', event);
         }
@@ -164,6 +270,9 @@ export class PlannerTextProcessor {
     }
   }
 
+  /**
+   * Normalize time range (e.g., "9:00-10:30am")
+   */
   normalizeTimeRange(text, context = '') {
     console.log('Normalizing time range:', text, 'with context:', context);
     
@@ -195,6 +304,9 @@ export class PlannerTextProcessor {
     };
   }
 
+  /**
+   * Normalize individual time (e.g., "9:00am")
+   */
   normalizeTime(text, context = '', inferredMeridian = '') {
     if (!text || typeof text !== 'string') {
       console.log('Invalid time input:', text);
@@ -206,64 +318,68 @@ export class PlannerTextProcessor {
       
       // Clean the input
       text = text.toLowerCase()
-        .replace(/[^\d:apm]/g, '')  // Remove any non-time characters
-        .replace(/^\s+|\s+$/g, ''); // Trim whitespace
+        .replace(/[^\d:apm]/g, '')
+        .replace(/^\s+|\s+$/g, '');
   
       // Extract components
       const match = text.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/);
       if (!match) {
-        console.log('No time match found');
+        console.log('No time match found for:', text);
         return null;
       }
   
-      let [_, hours, minutes = '00', meridian = ''] = match;
+      let [_, hours, minutes = '00', meridian] = match;
       hours = parseInt(hours);
       minutes = parseInt(minutes);
   
-      // Validate components
-      if (isNaN(hours) || isNaN(minutes) || hours < 1 || hours > 12 || minutes < 0 || minutes > 59) {
-        console.log('Invalid time components:', { hours, minutes });
+      // Use inferred meridian if not provided
+      if (!meridian && inferredMeridian) {
+        meridian = inferredMeridian;
+      }
+  
+      // Validate hours
+      if (hours < 1 || hours > 12) {
+        console.log('Invalid hours:', hours);
         return null;
       }
   
-      // Use provided meridian if available, otherwise infer it
+      // Infer meridian if not provided
       if (!meridian) {
-        meridian = inferredMeridian || this.inferMeridian(hours, context);
+        meridian = this.inferMeridian(hours, context);
       }
   
-      // Return as a properly formatted string
-      return `${hours}:${minutes.toString().padStart(2, '0')}${meridian}`;
+      const normalizedTime = `${hours}:${minutes.toString().padStart(2, '0')}${meridian}`;
+      console.log('Normalized time:', text, '=>', normalizedTime);
+      return normalizedTime;
+  
     } catch (error) {
       console.error('Time normalization error:', error);
       return null;
     }
   }
 
+  /**
+   * Infer AM/PM based on context and hour
+   */
   inferMeridian(hours, context) {
-    // First check context keywords
-    const contextLower = context.toLowerCase();
-    if (this.timeKeywords.morning.some(word => contextLower.includes(word))) {
+    const lowerContext = context.toLowerCase();
+    
+    if (lowerContext.includes('lunch') || lowerContext.includes('dinner')) {
+      return 'pm';
+    } else if (lowerContext.includes('breakfast') || lowerContext.includes('morning')) {
       return 'am';
-    } else if (this.timeKeywords.afternoon.some(word => contextLower.includes(word))) {
-      return 'pm';
-    } else if (this.timeKeywords.evening.some(word => contextLower.includes(word))) {
-      return 'pm';
-    }
-
-    // Use business hours pattern if no context clues
-    if (hours === 12) {
-      return 'pm'; // 12:00 is typically noon during business hours
-    } else if (hours >= 1 && hours <= 5) {
-      return 'pm'; // 1:00-5:00 are typically PM during business/school hours
-    } else if (hours >= 6 && hours <= 7) {
-      return 'am'; // 6:00-7:00 morning activities
+    } else if (hours >= 1 && hours <= 7) {
+      return 'am'; // Early morning times
     } else if (hours >= 8 && hours <= 11) {
-      return 'am'; // 8:00-11:00 are typically AM during business/school hours
+      return 'am'; // Business/school hours
     }
     
-    return 'am'; // Default to AM for edge cases
+    return 'am'; // Default to AM
   }
 
+  /**
+   * Find which section a text block belongs to
+   */
   findSectionForBlock(block) {
     if (!block.bounding?.top) return null;
   
@@ -290,18 +406,64 @@ export class PlannerTextProcessor {
     return null;
   }
 
+  /**
+   * Check if block is likely from QR code area
+   */
+  isQRCodeBlock(block) {
+    if (!block.bounding || !block.text) return false;
+    
+    // Check if text is exactly 11 digits
+    const cleanText = block.text.replace(/\s/g, '');
+    const isElevenDigits = /^\d{11}$/.test(cleanText);
+    
+    // Check if in bottom area of image
+    const isBottomArea = block.bounding.top > 0.75; // Bottom 25% of image
+    
+    // Check if in center horizontally
+    const blockCenter = (block.bounding.left + block.bounding.right) / 2;
+    const imageWidth = Math.max(...this.recognized.sections.map(s => s.topPosition || 0)) || 1000;
+    const isCenter = Math.abs(blockCenter - imageWidth / 2) < imageWidth * 0.2; // Within 20% of center
+    
+    return isElevenDigits && isBottomArea && isCenter;
+  }
+
+  /**
+   * Check if block is a header (day name, date, etc.)
+   */
+  isHeaderBlock(text) {
+    const headerPatterns = [
+      /^20\d{2}$/,
+      /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)/i,
+      /things to do/i,
+      /^\d{1,2}\/\d{1,2}$/,
+      /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i
+    ];
+    
+    return headerPatterns.some(pattern => pattern.test(text.trim()));
+  }
+
+  /**
+   * Validate if extracted text is a valid event
+   */
   isValidEvent(event) {
     return event && 
            ((event.time && !event.hasTimeRange) || (event.startTime && event.endTime)) && 
            event.title && 
            event.title.length > 1 && 
-           !/^things to do$/i.test(event.title);
+           !/^things to do$/i.test(event.title) &&
+           !/^\d{11}$/.test(event.title.replace(/\s/g, ''));
   }
 
+  /**
+   * Compare two time strings for sorting
+   */
   compareEventTimes(time1, time2) {
     return this.parseTimeString(time1) - this.parseTimeString(time2);
   }
 
+  /**
+   * Parse time string to minutes for comparison
+   */
   parseTimeString(timeStr) {
     if (!timeStr) return 0;
 
@@ -312,63 +474,52 @@ export class PlannerTextProcessor {
     hours = parseInt(hours);
     minutes = parseInt(minutes);
 
-    if (meridian.toLowerCase() === 'pm' && hours < 12) hours += 12;
-    if (meridian.toLowerCase() === 'am' && hours === 12) hours = 0;
+    if (meridian.toLowerCase() === 'pm' && hours !== 12) {
+      hours += 12;
+    } else if (meridian.toLowerCase() === 'am' && hours === 12) {
+      hours = 0;
+    }
 
     return hours * 60 + minutes;
   }
 
-  async prepareImage() {
-    try {
-      console.log('Preparing image...');
-      
-      // First try with moderate compression
-      let result = await ImageManipulator.manipulateAsync(
-        this.imageUri,
-        [{ resize: { width: 1500 } }],
-        { format: 'jpeg', compress: 0.5 }
-      );
-      
-      // Get the blob to check size
-      const response = await fetch(result.uri);
-      let blob = await response.blob();
-      let size = blob.size / (1024 * 1024);
-      console.log('Initial image size:', size.toFixed(2) + 'MB');
-  
-      // If still too large, compress more aggressively
-      if (size > 3.5) {
-        result = await ImageManipulator.manipulateAsync(
-          this.imageUri,
-          [{ resize: { width: 1200 } }],
-          { format: 'jpeg', compress: 0.3 }
-        );
-        const response2 = await fetch(result.uri);
-        blob = await response2.blob();
-        size = blob.size / (1024 * 1024);
-        console.log('Compressed image size:', size.toFixed(2) + 'MB');
-      }
-  
-      if (size > 4) {
-        throw new Error('Unable to compress image below 4MB limit');
-      }
-  
-      return result;
-    } catch (error) {
-      console.error('Image preparation failed:', error);
-      throw error;
-    }
-  }
-
+  /**
+   * Calculate overall processing confidence
+   */
   calculateConfidence() {
-    const confidenceScores = this.recognized.sections
-      .flatMap(section => section.events)
-      .map(event => event.confidence)
-      .filter(score => typeof score === 'number');
+    if (this.recognized.sections.length === 0) {
+      this.recognized.metadata.totalConfidence = 0;
+      return;
+    }
 
-    this.recognized.metadata.confidence = confidenceScores.length > 0
-      ? confidenceScores.reduce((a, b) => a + b) / confidenceScores.length
-      : 0;
+    const totalEvents = this.recognized.sections.reduce((sum, section) => 
+      sum + section.events.length, 0);
+    
+    if (totalEvents === 0) {
+      this.recognized.metadata.totalConfidence = 0.3;
+      return;
+    }
+
+    const avgEventConfidence = this.recognized.sections.reduce((sum, section) => {
+      const sectionConfidence = section.events.reduce((eventSum, event) => 
+        eventSum + event.confidence, 0) / (section.events.length || 1);
+      return sum + sectionConfidence;
+    }, 0) / this.recognized.sections.length;
+
+    // Boost confidence if QR code was successfully processed
+    const qrBonus = this.qrData ? 0.1 : 0;
+    
+    // Boost confidence if template expectations were met
+    let templateBonus = 0;
+    if (this.qrData && this.recognized.sections.length === this.qrData.daysOnPage) {
+      templateBonus = 0.1;
+    }
+    
+    this.recognized.metadata.totalConfidence = Math.min(
+      avgEventConfidence + qrBonus + templateBonus, 
+      1.0
+    );
+    
+    console.log('Total confidence calculated:', this.recognized.metadata.totalConfidence);
   }
 }
-
-export default PlannerTextProcessor;

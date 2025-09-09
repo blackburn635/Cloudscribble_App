@@ -336,4 +336,4 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginTop: 20,
   },
-});
+}); 

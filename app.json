@@ -33,13 +33,15 @@
           }
         }
       ],
-      ["expo-camera",
+      [
+        "expo-camera",
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera.",
           "microphonePermission": false
         }
       ],
-      ["expo-calendar",
+      [
+        "expo-calendar",
         {
           "calendarPermission": "Allow $(PRODUCT_NAME) to access your calendar to add planner events",
           "remindersPermission": "Allow $(PRODUCT_NAME) to access your reminders to add planner events"
@@ -64,7 +66,10 @@
       },
       "package": "com.anonymous.plannerscanner",
       "jsEngine": "hermes",
-      "permissions": ["READ_CALENDAR", "WRITE_CALENDAR"]
+      "permissions": [
+        "READ_CALENDAR",
+        "WRITE_CALENDAR"
+      ]
     }
   }
 }
