@@ -1,3 +1,4 @@
+// components/PlannerCamera.js
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   StyleSheet,
@@ -18,7 +19,10 @@ const PlannerCamera = ({ onPhotoCapture }) => {
   
   // Calculate height to maintain 8.5:11 aspect ratio
   const screenWidth = Dimensions.get('window').width;
-  const height = (screenWidth * 11) / 8.5; // New aspect ratio for single page
+  const height = (screenWidth * 11) / 8.5; // Aspect ratio for single page
+  
+  // Calculate QR detection box size (1/8 of frame width, squared)
+  const qrBoxSize = screenWidth / 8;
 
   const cameraRef = useRef(null);
 
@@ -135,6 +139,18 @@ const PlannerCamera = ({ onPhotoCapture }) => {
             </View>
           </View>
           
+          {/* QR Code Detection Box - Bottom Center */}
+          <View 
+            style={[
+              styles.qrDetectionBox, 
+              { 
+                width: qrBoxSize, 
+                height: qrBoxSize,
+                left: (screenWidth - qrBoxSize) / 2, // Center horizontally
+              }
+            ]} 
+          />
+          
           <TouchableOpacity
             style={[styles.captureButton, !isCameraReady && styles.buttonDisabled]}
             onPress={handleCapture}
@@ -188,6 +204,14 @@ const styles = StyleSheet.create({
   },
   todosColumn: {
     flex: 1,
+  },
+  qrDetectionBox: {
+    position: 'absolute',
+    bottom: '8%', // Position at bottom with some margin
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.7)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(255,255,255,0.1)',
   },
   captureButton: {
     position: 'absolute',

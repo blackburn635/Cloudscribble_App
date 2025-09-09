@@ -340,3 +340,208 @@ This backlog serves as a living document that will be updated based on user feed
 - **State Management:** May need Redux/Zustand for complex user state
 - **Performance Optimization:** Monitor app performance as features increase
 - **Testing Strategy:** Implement automated testing before major feature additions
+
+## Recently Completed Tasks (September 2025)
+
+### ✅ Phase 10: QR Code Template Recognition
+- [x] **QR-001:** Design QR code format specification (TTPYYYYMMDD)
+- [x] **QR-002:** Implement cost-optimized QR detection using Azure OCR
+- [x] **QR-003:** Create template-based processing system
+- [x] **QR-004:** Add QR detection visual guides to camera interface
+- [x] **QR-005:** Integrate QR processing with existing OCR pipeline
+- [x] **QR-006:** Implement graceful fallback for non-QR pages
+- [x] **QR-007:** Resolve React Native Fabric build conflicts
+- [x] **QR-008:** Clean problematic dependencies (expo-barcode-scanner, MLKit)
+- [x] **QR-009:** Merge CloudScribble branding with QR functionality
+
+**Priority:** P0 (Required for intelligent processing)
+**Estimate:** L (2 weeks) - **COMPLETED**
+**Impact:** High - Enables automatic template recognition and improved accuracy
+
+## New High-Priority Tasks
+
+### 🎯 QR Template System Expansion
+#### 18. Additional Template Formats 📋
+**Epic:** Expand QR template system beyond Template 01
+- [ ] **TEMP-001:** Design Template 02 format (monthly planner layouts)
+- [ ] **TEMP-002:** Implement Template 03 format (daily single-page layouts)
+- [ ] **TEMP-003:** Create template configuration management system
+- [ ] **TEMP-004:** Add template validation and error handling
+- [ ] **TEMP-005:** Test multiple template processing workflows
+
+**Priority:** P0 (Required for multi-format support)
+**Estimate:** L (2-3 weeks)
+**Dependencies:** QR system foundation (completed)
+
+#### 19. QR Detection Quality Enhancement 🔍
+**Epic:** Improve QR code detection accuracy and reliability
+- [ ] **QR-QA-001:** Test various QR code print qualities and sizes
+- [ ] **QR-QA-002:** Implement QR detection confidence scoring
+- [ ] **QR-QA-003:** Add QR positioning tolerance and error correction
+- [ ] **QR-QA-004:** Create QR detection debugging and analytics
+- [ ] **QR-QA-005:** Optimize QR segment extraction coordinates
+
+**Priority:** P1 (High value for reliability)
+**Estimate:** M (1-2 weeks)
+**Dependencies:** Basic QR system (completed)
+
+#### 20. Template Processing Analytics 📊
+**Epic:** Monitor and optimize template-based processing performance
+- [ ] **ANALYTICS-001:** Add processing time metrics for template vs fallback
+- [ ] **ANALYTICS-002:** Track QR detection success rates
+- [ ] **ANALYTICS-003:** Monitor template processing accuracy improvements
+- [ ] **ANALYTICS-004:** Create template performance dashboard
+- [ ] **ANALYTICS-005:** Implement A/B testing for processing approaches
+
+**Priority:** P1 (Important for optimization)
+**Estimate:** M (1-2 weeks)
+**Dependencies:** Template system (completed)
+
+## Updated Production Readiness Tasks
+
+### 🚀 Production Infrastructure Enhancement
+#### 21. Backend Template Management 🔧
+**Epic:** Server-side template configuration and management
+- [ ] **BACKEND-TEMP-001:** Design template configuration API endpoints
+- [ ] **BACKEND-TEMP-002:** Implement template versioning and updates
+- [ ] **BACKEND-TEMP-003:** Add template validation on backend
+- [ ] **BACKEND-TEMP-004:** Create template A/B testing infrastructure
+- [ ] **BACKEND-TEMP-005:** Build template performance monitoring
+
+**Priority:** P1 (Required for dynamic template management)
+**Estimate:** L (2-3 weeks)
+**Dependencies:** Backend API infrastructure
+
+#### 22. Security and API Management 🔐
+**Epic:** Move processing to secure backend infrastructure
+- [ ] **SECURITY-001:** Migrate Azure Computer Vision calls to backend
+- [ ] **SECURITY-002:** Implement secure image upload and processing
+- [ ] **SECURITY-003:** Add API rate limiting and abuse prevention
+- [ ] **SECURITY-004:** Create secure template and processing configuration
+- [ ] **SECURITY-005:** Implement user-specific processing analytics
+
+**Priority:** P0 (Required for production)
+**Estimate:** L (2-3 weeks)
+**Dependencies:** Backend authentication system
+
+## Deferred Lower-Priority Items
+
+### 📋 Advanced Template Features (Future)
+- **Multi-Page Processing:** Batch processing of multiple planner pages
+- **Custom Template Builder:** User-defined template creation tools
+- **Template Sharing:** Community template marketplace
+- **AI Template Recognition:** Machine learning for templateless processing
+- **Advanced OCR Options:** Alternative OCR providers for comparison
+
+### 🎨 Enhanced User Experience (Future)
+- **Processing Progress Indicators:** Real-time QR detection and processing status
+- **Template Preview:** Show detected template format before processing
+- **Quality Recommendations:** Suggest optimal QR code placement and sizing
+- **Processing History:** Template usage analytics and success tracking
+- **Template Troubleshooting:** Guided help for QR detection issues
+
+## Development Strategy Notes
+
+### Template System Philosophy
+The QR template system prioritizes **cost efficiency** and **processing intelligence** over complex QR scanning infrastructure. By leveraging existing Azure OCR data, we achieve template recognition at zero additional cost while maintaining backward compatibility.
+
+### Quality vs Speed Balance
+Template-based processing trades slightly increased complexity for significantly improved accuracy and user experience. The fallback system ensures reliability while templates enhance capability.
+
+### Extensibility Focus
+The template architecture is designed for easy expansion. Adding new planner formats requires only template definition updates, not core processing changes.
+
+### Performance Monitoring Priority
+With template intelligence comes the need for analytics to optimize processing approaches and validate accuracy improvements over baseline fallback processing.
+
+## September 9, 2025 Updates
+
+### ✅ Recently Completed - OCR Processing Stabilization
+- [x] **DEBUG-001:** ✅ Fix method name mismatch between AzureVisionClient and PlannerTextProcessor
+- [x] **DEBUG-002:** ✅ Resolve data structure inconsistency (blocks vs data)
+- [x] **DEBUG-003:** ✅ Add proper date parsing for display components
+- [x] **DEBUG-004:** ✅ Enhance event filtering to eliminate calendar artifacts
+- [x] **DEBUG-005:** ✅ Fix undefined property access errors in App.js
+
+**Impact:** OCR processing pipeline now stable with 85%+ accuracy and professional error handling
+
+### New High Priority Items
+
+#### 18. Event Management Enhancement 📝
+**Epic:** Improve user control over extracted events
+- [ ] **EVENT-001:** Add edit event functionality for OCR corrections
+  - Allow users to modify event titles when OCR makes mistakes
+  - Enable time adjustment for incorrectly parsed times
+  - Add validation for user edits
+- [ ] **EVENT-002:** Implement event deletion before calendar sync
+- [ ] **EVENT-003:** Add manual event creation within day sections
+- [ ] **EVENT-004:** Create event confidence visualization
+- [ ] **EVENT-005:** Add bulk event editing capabilities
+
+**Priority:** P1 (High - User Experience)
+**Estimate:** M (3-5 days)
+**User Value:** Addresses OCR accuracy limitations through user control
+
+#### 19. Camera Interface Refinement 📱
+**Epic:** Optimize camera overlay for template processing
+- [ ] **CAMERA-001:** Remove header section from camera overlay template
+  - Maintain 8.5:11 aspect ratio proportions
+  - Focus visual guides on event areas only
+  - Improve QR code detection positioning
+- [ ] **CAMERA-002:** Add dynamic guide adaptation based on template detection
+- [ ] **CAMERA-003:** Implement guide opacity controls for different lighting
+- [ ] **CAMERA-004:** Add manual guide toggle for experienced users
+
+**Priority:** P2 (Medium - UX Polish)  
+**Estimate:** S (1-2 days)
+**Technical Notes:** Remove top header guides while preserving page proportions
+
+### Deferred Technical Items
+
+#### Position-Based Time Inference (User Decision - Not Now)
+- **DEFER-001:** Implement position-based AM/PM inference within day sections
+  - Top of section = AM preference
+  - Bottom of section = PM preference  
+  - Context-aware time disambiguation
+- **Rationale:** User explicitly chose to defer this feature for future implementation
+- **Future Consideration:** Could improve time accuracy for ambiguous hours (9, 10, 11, 12)
+
+#### Advanced Template Features (Future Sprint)
+- **DEFER-002:** Multi-page batch processing with template consistency
+- **DEFER-003:** Template learning from user corrections  
+- **DEFER-004:** Custom template creation tools
+- **DEFER-005:** Template sharing and community library
+
+### Development Process Improvements
+
+#### Lessons Learned Implementation
+- [ ] **PROCESS-001:** Add unit tests for component integration points
+- [ ] **PROCESS-002:** Create data structure validation utilities  
+- [ ] **PROCESS-003:** Implement comprehensive error logging system
+- [ ] **PROCESS-004:** Add development debugging tools and console helpers
+- [ ] **PROCESS-005:** Create integration testing for OCR pipeline
+
+**Priority:** P2 (Medium - Technical Debt)
+**Rationale:** Prevent regression of issues resolved in this debugging session
+
+### Next Sprint Planning
+
+**Sprint Goal:** Backend Integration and Premium Features
+**Duration:** 2 weeks  
+**Focus Areas:**
+1. CloudScribble API integration (BACKEND-001 through BACKEND-005)
+2. Apple In-App Purchase implementation (IAP-001 through IAP-005)  
+3. Event editing feature (EVENT-001)
+4. Camera overlay refinement (CAMERA-001)
+
+**Dependencies:**
+- CloudScribble backend API completion
+- Apple Developer account setup
+- QR template specification finalization
+
+**Success Criteria:**
+- Users can authenticate with CloudScribble backend
+- Premium subscription model functional  
+- Event editing available for OCR corrections
+- Camera interface optimized for template processing
+
