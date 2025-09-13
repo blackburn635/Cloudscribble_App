@@ -11,13 +11,19 @@ import {
   Alert
 } from 'react-native';
 import * as Calendar from 'expo-calendar';
+import CalendarSync from './CalendarSync';
 
-const CalendarSelector = ({ isVisible, onClose, events }) => {
+const CalendarSelector = ({ isVisible, onClose, events, onWriteInPlannerEvents }) => {
   const [calendars, setCalendars] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importStatus, setImportStatus] = useState(null);
   const [importProgress, setImportProgress] = useState(0);
   const [duplicateCount, setDuplicateCount] = useState(0);
+  
+  // Calendar Sync State - NEW
+  const [showCalendarSync, setShowCalendarSync] = useState(false);
+  const [selectedCalendarId, setSelectedCalendarId] = useState(null);
+  const [dateRangeForSync, setDateRangeForSync] = useState(null);
 
   useEffect(() => {
     loadCalendars();
@@ -44,6 +50,32 @@ const CalendarSelector = ({ isVisible, onClose, events }) => {
     } finally {
       setLoading(false);
     }
+  };
+  
+  // NEW: Extract date range from events
+  const getDateRangeFromEvents = () => {
+    if (!events || events.length === 0) return null;
+    
+    // Find the earliest and latest dates from all events
+    let earliestDate = null;
+    let latestDate = null;
+    
+    events.forEach(event => {
+      if (event.date) {
+        const eventDate = new Date(event.date);
+        if (!earliestDate || eventDate < earliestDate) {
+          earliestDate = eventDate;
+        }
+        if (!latestDate || eventDate > latestDate) {
+          latestDate = eventDate;
+        }
+      }
+    });
+    
+    return {
+      start: earliestDate,
+      end: latestDate
+    };
   };
 
   const checkForDuplicateEvent = async (calendarId, event, eventDate) => {
@@ -181,7 +213,15 @@ const CalendarSelector = ({ isVisible, onClose, events }) => {
       Alert.alert(
         'Import Complete',
         message + (errors.length > 0 ? `\n\nErrors:\n${errors.join('\n')}` : ''),
-        [{ text: 'OK', onPress: onClose }]
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            // NEW: After successful import, show the Calendar Sync modal
+            setSelectedCalendarId(calendarId);
+            setDateRangeForSync(getDateRangeFromEvents());
+            setShowCalendarSync(true);
+          }
+        }]
       );
 
     } catch (error) {
@@ -194,52 +234,128 @@ const CalendarSelector = ({ isVisible, onClose, events }) => {
       );
     }
   };
+  
+  // NEW: Handle calendar sync actions
+  const handleCalendarSyncActions = (actions) => {
+    console.log('Calendar sync actions:', actions);
+    
+    // Handle write-in-planner events
+    if (actions.writeInPlanner && actions.writeInPlanner.length > 0) {
+      // Pass events back to parent component
+      if (onWriteInPlannerEvents) {
+        onWriteInPlannerEvents(actions.writeInPlanner);
+      }
+      
+      // Removed the "Write in Planner" alert - the Success alert handles notification
+    }
+    
+    // Close the sync modal
+    setShowCalendarSync(false);
+    
+    // Optionally close the entire calendar selector after sync
+    // Uncomment if you want to close everything after sync:
+    // onClose();
+  };
 
   const renderCalendarItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.calendarItem}
-      onPress={() => importToCalendar(item.id)}
-    >
-      <View style={[styles.calendarColor, { backgroundColor: item.color }]} />
-      <Text style={styles.calendarName}>{item.title}</Text>
-    </TouchableOpacity>
+    <View style={styles.calendarItemContainer}>
+      <TouchableOpacity
+        style={styles.calendarItem}
+        onPress={() => importToCalendar(item.id)}
+      >
+        <View style={[styles.calendarColor, { backgroundColor: item.color }]} />
+        <Text style={styles.calendarName}>{item.title}</Text>
+      </TouchableOpacity>
+      
+      {/* NEW: Optional button to directly check for orphaned events */}
+      <TouchableOpacity
+        style={styles.syncIconButton}
+        onPress={() => {
+          setSelectedCalendarId(item.id);
+          setDateRangeForSync(getDateRangeFromEvents());
+          setShowCalendarSync(true);
+        }}
+      >
+        <Text style={styles.syncIcon}>🔄</Text>
+      </TouchableOpacity>
+    </View>
   );
 
-  return (
-    <Modal
-      visible={isVisible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Select Calendar</Text>
-          
-          {loading ? (
-            <ActivityIndicator size="large" color="#007AFF" />
-          ) : importStatus === 'importing' ? (
-            <View style={styles.importingContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
-              <Text style={styles.importingText}>
-                Importing events... {Math.round(importProgress)}%
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={calendars}
-              renderItem={renderCalendarItem}
-              keyExtractor={(item) => item.id}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-            />
-          )}
+  // Convert events to sections format for CalendarSync
+  const extractedEventSections = events ? [{
+    day: 'All Events',
+    events: events
+  }] : [];
 
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Cancel</Text>
-          </TouchableOpacity>
+  return (
+    <>
+      <Modal
+        visible={isVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={onClose}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Calendar</Text>
+            
+            {loading ? (
+              <ActivityIndicator size="large" color="#007AFF" />
+            ) : importStatus === 'importing' ? (
+              <View style={styles.importingContainer}>
+                <ActivityIndicator size="large" color="#007AFF" />
+                <Text style={styles.importingText}>
+                  Importing events... {Math.round(importProgress)}%
+                </Text>
+              </View>
+            ) : (
+              <>
+                <FlatList
+                  data={calendars}
+                  renderItem={renderCalendarItem}
+                  keyExtractor={(item) => item.id}
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+                
+                {/* NEW: Optional button to check all calendars */}
+                <TouchableOpacity 
+                  style={styles.checkOrphanedButton}
+                  onPress={() => {
+                    if (calendars.length > 0) {
+                      Alert.alert(
+                        'Select Calendar',
+                        'Please select a calendar first to check for orphaned events',
+                        [{ text: 'OK' }]
+                      );
+                    }
+                  }}
+                >
+                  <Text style={styles.checkOrphanedButtonText}>
+                    Check for Orphaned Events
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <Text style={styles.closeButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
+      
+      {/* NEW: Calendar Sync Modal */}
+      {showCalendarSync && (
+        <CalendarSync
+          isVisible={showCalendarSync}
+          onClose={() => setShowCalendarSync(false)}
+          calendarId={selectedCalendarId}
+          extractedEvents={extractedEventSections}
+          dateRange={dateRangeForSync}
+          onConfirmActions={handleCalendarSyncActions}
+        />
+      )}
+    </>
   );
 };
 
@@ -263,10 +379,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
+  calendarItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   calendarItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
+    flex: 1,
   },
   calendarColor: {
     width: 20,
@@ -276,10 +398,30 @@ const styles = StyleSheet.create({
   },
   calendarName: {
     fontSize: 16,
+    flex: 1,
+  },
+  syncIconButton: {
+    padding: 15,
+    paddingLeft: 0,
+  },
+  syncIcon: {
+    fontSize: 20,
   },
   separator: {
     height: 1,
     backgroundColor: '#E0E0E0',
+  },
+  checkOrphanedButton: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: '#00B4AB',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  checkOrphanedButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   closeButton: {
     marginTop: 20,
