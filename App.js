@@ -41,6 +41,9 @@ export default function App() {
   const [showEditEvent, setShowEditEvent] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingEventSection, setEditingEventSection] = useState(null);
+  
+  // Calendar Sync State - NEW
+  const [writeInPlannerEvents, setWriteInPlannerEvents] = useState([]);
 
   useEffect(() => {
     console.log('CloudScribble App is starting up...');
@@ -71,6 +74,7 @@ export default function App() {
             setShowEditEvent(false);
             setEditingEvent(null);
             setEditingEventSection(null);
+            setWriteInPlannerEvents([]); // Clear write-in-planner events
           }
         }
       ]
@@ -200,6 +204,36 @@ export default function App() {
       
       return newData;
     });
+  };
+  
+  // NEW: Handle write-in-planner events from Calendar Sync
+  const handleWriteInPlannerEvents = (events) => {
+    setWriteInPlannerEvents(events);
+    // Optionally show a notification or badge
+  };
+  
+  // NEW: Format event date for display
+  const formatCalendarEventDate = (event) => {
+    const date = new Date(event.startDate);
+    const dayOptions = { weekday: 'long' };
+    const dateOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+    const dayOfWeek = date.toLocaleDateString('en-US', dayOptions);
+    const fullDate = date.toLocaleDateString('en-US', dateOptions);
+    return `${dayOfWeek}, ${fullDate}`;
+  };
+
+  // NEW: Format event time for display
+  const formatCalendarEventTime = (event) => {
+    const date = new Date(event.startDate);
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    
+    let displayHours = hours;
+    const meridian = hours >= 12 ? 'pm' : 'am';
+    if (hours > 12) displayHours -= 12;
+    if (hours === 0) displayHours = 12;
+    
+    return `${displayHours}:${minutes.toString().padStart(2, '0')}${meridian}`;
   };
 
   const getTotalEvents = () => {
@@ -333,6 +367,26 @@ export default function App() {
         <Text style={styles.dataHeader}>
           Extracted Events ({getTotalEvents()})
         </Text>
+        
+        {/* NEW: Write-in-planner reminder section */}
+        {writeInPlannerEvents.length > 0 && (
+          <View style={styles.writeInPlannerReminder}>
+            <Text style={styles.reminderTitle}>📝 Write in Planner:</Text>
+            {writeInPlannerEvents.map((event, index) => (
+              <View key={index} style={styles.reminderItem}>
+                <Text style={styles.reminderDate}>{formatCalendarEventDate(event)}</Text>
+                <Text style={styles.reminderTime}>{formatCalendarEventTime(event)}</Text>
+                <Text style={styles.reminderText}>{event.title}</Text>
+              </View>
+            ))}
+            <TouchableOpacity
+              style={styles.dismissButton}
+              onPress={() => setWriteInPlannerEvents([])}
+            >
+              <Text style={styles.dismissButtonText}>Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {extractedData.sections.map((section, sectionIndex) => (
           <View key={sectionIndex} style={styles.sectionContainer}>
@@ -354,7 +408,7 @@ export default function App() {
                       style={styles.actionButton}
                       onPress={() => handleEditEvent(event, section)}
                     >
-                      <Text style={styles.actionIcon}>Edit</Text>
+                      <Text style={styles.actionIcon}>✏️</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -362,47 +416,40 @@ export default function App() {
             ))}
             {section.events.length === 0 && (
               <View style={styles.noEventsContainer}>
-                <Text style={styles.noEventsText}>No events found for this day</Text>
+                <Text style={styles.noEventsText}>No events detected for this day</Text>
               </View>
             )}
           </View>
         ))}
 
-        <View style={styles.metadataContainer}>
-          <Text style={[styles.metadataText, { color: getStatusColor('success') }]}>
-            Overall Confidence: {(extractedData.metadata.confidence * 100).toFixed(1)}%
-          </Text>
-        </View>
+        {extractedData.metadata && (
+          <View style={styles.metadataContainer}>
+            <Text style={[styles.metadataText, { color: getStatusColor(extractedData.metadata.totalConfidence) }]}>
+              Overall Confidence: {(extractedData.metadata.totalConfidence * 100).toFixed(1)}%
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
 
-  // Camera screen
   if (showCamera) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" backgroundColor={BackgroundColors.main} />
-        
-        <NavigationHeader 
-          title="Scan Planner Page"
-          onBackPress={handleCameraBack}
-          onHomePress={handleGoHome}
-        />
-        
-        <PlannerCamera onPhotoCapture={handlePhotoCapture} />
-      </SafeAreaView>
+      <PlannerCamera 
+        onPhotoCapture={handlePhotoCapture}
+        onBackPress={handleCameraBack}
+      />
     );
   }
 
-  // Main app screen
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" backgroundColor={BackgroundColors.main} />
+      <StatusBar style="dark" />
       
       <View style={styles.appHeader}>
         <View style={styles.logoPanel}>
           <Image 
-            source={require('./assets/icons/Full_Icon_no_background.png')}
+            source={require('./assets/icons/Full_Icon_no_background.png')} 
             style={styles.headerLogo}
             resizeMode="contain"
           />
@@ -491,6 +538,7 @@ export default function App() {
             timezone: extractedData.metadata.timezone
           }))
         ) || []}
+        onWriteInPlannerEvents={handleWriteInPlannerEvents}
       />
 
       <EditEvent
@@ -514,6 +562,16 @@ export default function App() {
   );
 }
 
+// ADD THIS FUNCTION
+const formatCalendarEventDate = (event) => {
+  const date = new Date(event.startDate);
+  const dayOptions = { weekday: 'long' };
+  const dateOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+  const dayOfWeek = date.toLocaleDateString('en-US', dayOptions);
+  const fullDate = date.toLocaleDateString('en-US', dateOptions);
+  return `${dayOfWeek}, ${fullDate}`;
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -528,94 +586,54 @@ const styles = StyleSheet.create({
   logoPanel: {
     backgroundColor: Colors.cream,
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    shadowColor: Colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   headerLogo: {
-    width: 200,
-    height: 79,
+    width: 120,
+    height: 120,
   },
-  
-  // Navigation Header Styles
-  navigationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: Colors.lavender,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.mauve,
-  },
-  navButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: Colors.cream,
-    borderWidth: 1,
-    borderColor: Colors.mauve,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  navButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.navy,
-  },
-  navTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.navy,
-    textAlign: 'center',
-    flex: 1,
-    marginHorizontal: 10,
-  },
-  
   scrollContainer: {
     flex: 1,
   },
   mainContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   welcomeContainer: {
-    alignItems: 'center',
     marginBottom: 40,
+    alignItems: 'center',
   },
   welcomeText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: TextColors.primary,
-    marginBottom: 15,
+    color: Colors.navy,
+    marginBottom: 10,
     textAlign: 'center',
   },
   instructionText: {
     fontSize: 16,
-    textAlign: 'center',
     color: TextColors.secondary,
+    textAlign: 'center',
+    paddingHorizontal: 20,
     lineHeight: 24,
-    paddingHorizontal: 10,
   },
   featureContainer: {
-    marginBottom: 40,
     width: '100%',
+    marginBottom: 40,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: BackgroundColors.card,
-    padding: 16,
+    backgroundColor: Colors.cream,
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 12,
-    borderRadius: 12,
     borderLeftWidth: 4,
-    borderLeftColor: Colors.mauve,
+    borderLeftColor: Colors.lightPurple,
     shadowColor: Colors.navy,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -623,104 +641,157 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   featureIcon: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: Colors.mauve,
+    fontSize: 24,
     marginRight: 15,
-    minWidth: 50,
   },
   featureText: {
     fontSize: 16,
     color: TextColors.primary,
-    fontWeight: '500',
+    flex: 1,
   },
   resultContainer: {
     flex: 1,
-    padding: 20,
+    backgroundColor: BackgroundColors.main,
+  },
+  navigationHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: Colors.creamAlt,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.sage,
+  },
+  navButton: {
+    padding: 8,
+  },
+  navButtonText: {
+    color: Colors.lightPurple,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  navTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.navy,
   },
   preview: {
     width: '100%',
-    height: 300,
-    marginBottom: 20,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.mauveLight,
-  },
-  headerContainer: {
-    marginBottom: 15,
-    padding: 15,
-    backgroundColor: Colors.lavender,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.mauve,
-  },
-  extractedHeaderText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: TextColors.primary,
-    textAlign: 'center',
+    height: 200,
+    marginVertical: 10,
   },
   processingContainer: {
+    padding: 40,
     alignItems: 'center',
-    padding: 30,
-    backgroundColor: BackgroundColors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.mauveLight,
   },
   processingText: {
     marginTop: 15,
     fontSize: 16,
     color: TextColors.secondary,
-    textAlign: 'center',
   },
   noDataContainer: {
+    padding: 40,
     alignItems: 'center',
-    padding: 30,
-    backgroundColor: Colors.sageOverlay,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.sage,
   },
   noDataText: {
     fontSize: 16,
-    color: TextColors.primary,
+    color: TextColors.secondary,
     marginBottom: 20,
     textAlign: 'center',
   },
   dataContainer: {
-    marginVertical: 20,
+    padding: 20,
+  },
+  headerContainer: {
+    backgroundColor: Colors.sageOverlay,
     padding: 15,
-    backgroundColor: BackgroundColors.card,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.mauveLight,
-  },
-  sectionContainer: {
+    borderRadius: 8,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.sage,
   },
-  sectionHeader: {
+  extractedHeaderText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: Colors.navy,
-    marginBottom: 10,
-    paddingBottom: 8,
-    borderBottomWidth: 2,
-    borderBottomColor: Colors.mauve,
+    textAlign: 'center',
   },
   dataHeader: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: TextColors.primary,
+    color: Colors.navy,
     marginBottom: 15,
     textAlign: 'center',
   },
-  eventItem: {
-    backgroundColor: BackgroundColors.card,
+  // NEW: Write-in-planner reminder styles
+  writeInPlannerReminder: {
+    backgroundColor: '#FFF8DC',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2D3748',
+    marginBottom: 12,
+  },
+  reminderItem: {
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#FFE4B5',
+  },
+  reminderDate: {
+    fontSize: 14,
+    color: '#2D3748',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  reminderTime: {
+    fontSize: 14,
+    color: '#00B4AB',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  reminderText: {
+    fontSize: 15,
+    color: '#4A5568',
+  },
+  dismissButton: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  dismissButtonText: {
+    fontSize: 14,
+    color: '#4A5568',
+    fontWeight: '600',
+  },
+  sectionContainer: {
+    marginBottom: 25,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.mauve,
     marginBottom: 10,
+    paddingBottom: 5,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.lavender,
+  },
+  eventItem: {
+    backgroundColor: Colors.cream,
     borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: Colors.sage,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Colors.sage,
     shadowColor: Colors.navy,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -746,8 +817,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.mauve,
   },
   actionIcon: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 16,
     color: Colors.navy,
   },
   eventTime: {
