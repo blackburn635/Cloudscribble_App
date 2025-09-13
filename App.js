@@ -52,6 +52,36 @@ export default function App() {
     setShowCamera(false);
   };
 
+  // Navigate back to home screen
+  const handleGoHome = () => {
+    Alert.alert(
+      'Return to Home',
+      'Are you sure you want to return to home? Any unsaved changes will be lost.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Go Home', 
+          style: 'destructive',
+          onPress: () => {
+            setShowCamera(false);
+            setCapturedImage(null);
+            setExtractedData(null);
+            setIsProcessing(false);
+            setShowCalendarSelector(false);
+            setShowEditEvent(false);
+            setEditingEvent(null);
+            setEditingEventSection(null);
+          }
+        }
+      ]
+    );
+  };
+
+  // Camera back navigation handler
+  const handleCameraBack = () => {
+    setShowCamera(false);
+  };
+
   const processImage = async () => {
     if (!capturedImage) return;
 
@@ -244,6 +274,29 @@ export default function App() {
     );
   };
 
+  // Navigation Header Component
+  const NavigationHeader = ({ title, onBackPress, onHomePress }) => {
+    return (
+      <View style={styles.navigationHeader}>
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={onBackPress}
+        >
+          <Text style={styles.navButtonText}>Back</Text>
+        </TouchableOpacity>
+        
+        <Text style={styles.navTitle}>{title}</Text>
+        
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={onHomePress}
+        >
+          <Text style={styles.navButtonText}>Home</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   const renderExtractedData = () => {
     if (isProcessing) {
       return (
@@ -261,7 +314,7 @@ export default function App() {
             Ready to extract events from your planner
           </Text>
           <CloudScribbleButton 
-            title="📖 Process Text" 
+            title="Process Text" 
             onPress={processImage}
             type="primary"
           />
@@ -278,7 +331,7 @@ export default function App() {
         </View>
 
         <Text style={styles.dataHeader}>
-          📅 Extracted Events ({getTotalEvents()})
+          Extracted Events ({getTotalEvents()})
         </Text>
 
         {extractedData.sections.map((section, sectionIndex) => (
@@ -301,7 +354,7 @@ export default function App() {
                       style={styles.actionButton}
                       onPress={() => handleEditEvent(event, section)}
                     >
-                      <Text style={styles.actionIcon}>✏️</Text>
+                      <Text style={styles.actionIcon}>Edit</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -317,27 +370,35 @@ export default function App() {
 
         <View style={styles.metadataContainer}>
           <Text style={[styles.metadataText, { color: getStatusColor('success') }]}>
-            ✅ Overall Confidence: {(extractedData.metadata.confidence * 100).toFixed(1)}%
+            Overall Confidence: {(extractedData.metadata.confidence * 100).toFixed(1)}%
           </Text>
         </View>
       </View>
     );
   };
 
+  // Camera screen
   if (showCamera) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" backgroundColor={BackgroundColors.main} />
+        
+        <NavigationHeader 
+          title="Scan Planner Page"
+          onBackPress={handleCameraBack}
+          onHomePress={handleGoHome}
+        />
+        
         <PlannerCamera onPhotoCapture={handlePhotoCapture} />
       </SafeAreaView>
     );
   }
 
+  // Main app screen
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" backgroundColor={BackgroundColors.main} />
       
-      {/* Navy Header with CloudScribble Icon */}
       <View style={styles.appHeader}>
         <View style={styles.logoPanel}>
           <Image 
@@ -351,6 +412,12 @@ export default function App() {
       <ScrollView style={styles.scrollContainer}>
         {capturedImage ? (
           <View style={styles.resultContainer}>
+            <NavigationHeader 
+              title="Event Extraction"
+              onBackPress={handleRetake}
+              onHomePress={handleGoHome}
+            />
+            
             <Image 
               source={{ uri: capturedImage }} 
               style={styles.preview}
@@ -359,13 +426,13 @@ export default function App() {
             {renderExtractedData()}
             <View style={styles.buttonContainer}>
               <CloudScribbleButton 
-                title="📷 Retake Photo" 
+                title="Retake Photo" 
                 onPress={handleRetake}
                 type="secondary"
               />
               {extractedData && !isProcessing && (
                 <CloudScribbleButton 
-                  title="📅 Save to Calendar" 
+                  title="Save to Calendar" 
                   onPress={() => setShowCalendarSelector(true)}
                   type="success"
                 />
@@ -410,7 +477,6 @@ export default function App() {
         )}
       </ScrollView>
 
-      {/* Calendar Selector Modal */}
       <CalendarSelector
         isVisible={showCalendarSelector}
         onClose={() => setShowCalendarSelector(false)}
@@ -427,7 +493,6 @@ export default function App() {
         ) || []}
       />
 
-      {/* Edit Event Modal */}
       <EditEvent
         isVisible={showEditEvent}
         onClose={() => {
@@ -475,6 +540,42 @@ const styles = StyleSheet.create({
     width: 200,
     height: 79,
   },
+  
+  // Navigation Header Styles
+  navigationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.lavender,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.mauve,
+  },
+  navButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.cream,
+    borderWidth: 1,
+    borderColor: Colors.mauve,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  navButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.navy,
+  },
+  navTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.navy,
+    textAlign: 'center',
+    flex: 1,
+    marginHorizontal: 10,
+  },
+  
   scrollContainer: {
     flex: 1,
   },
@@ -522,8 +623,11 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   featureIcon: {
-    fontSize: 24,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.mauve,
     marginRight: 15,
+    minWidth: 50,
   },
   featureText: {
     fontSize: 16,
@@ -642,7 +746,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.mauve,
   },
   actionIcon: {
-    fontSize: 20,
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.navy,
   },
   eventTime: {
     fontSize: 16,
