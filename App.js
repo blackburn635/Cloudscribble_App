@@ -326,7 +326,7 @@ export default function App() {
       <View style={styles.dataContainer}>
         <View style={styles.headerContainer}>
           <Text style={styles.extractedHeaderText}>
-            Week of {extractedData.sections[0]?.month} {extractedData.sections[0]?.date}, {extractedData.year}
+            Page of {extractedData.sections[0]?.month} {extractedData.sections[0]?.date}, {extractedData.year}
           </Text>
         </View>
 
@@ -463,7 +463,7 @@ export default function App() {
               </View>
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>📅</Text>
-                <Text style={styles.featureText}>Sync to the calendar of your choice</Text>
+                <Text style={styles.featureText}>Sync to the your calendar</Text>
               </View>
             </View>
 
