@@ -28,6 +28,7 @@ import {
 import PlannerCamera from './components/PlannerCamera';
 import { PlannerTextProcessor } from './utils/PlannerTextProcessor';
 import CalendarSelector from './components/CalendarSelector';
+import EditEvent from './components/EditEvent';
 
 export default function App() {
   const [showCamera, setShowCamera] = useState(false);
@@ -35,6 +36,11 @@ export default function App() {
   const [extractedData, setExtractedData] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCalendarSelector, setShowCalendarSelector] = useState(false);
+  
+  // Edit Event State
+  const [showEditEvent, setShowEditEvent] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [editingEventSection, setEditingEventSection] = useState(null);
 
   useEffect(() => {
     console.log('CloudScribble App is starting up...');
@@ -58,7 +64,22 @@ export default function App() {
 
       if (result.success) {
         console.log('Text processing successful:', result.data);
-        setExtractedData(result.data);
+        
+        // Add unique IDs and day section references to events
+        const processedData = {
+          ...result.data,
+          sections: result.data.sections.map(section => ({
+            ...section,
+            events: section.events.map((event, index) => ({
+              ...event,
+              id: `${section.day}-${index}-${Date.now()}`,
+              daySection: section.day,
+              date: section.date
+            }))
+          }))
+        };
+        
+        setExtractedData(processedData);
       } else {
         throw new Error(result.error || 'Text processing failed');
       }
@@ -83,6 +104,74 @@ export default function App() {
     setShowCamera(true);
   };
 
+  const handleEditEvent = (event, section) => {
+    console.log('Editing event:', event);
+    setEditingEvent({
+      ...event,
+      daySection: section.day,
+      date: section.date
+    });
+    setEditingEventSection(section);
+    setShowEditEvent(true);
+  };
+
+  const handleSaveEvent = (editedEvent) => {
+    console.log('Saving edited event:', editedEvent);
+    
+    setExtractedData(prevData => {
+      const newData = { ...prevData };
+      
+      // Find the original section and remove the event
+      const originalSection = newData.sections.find(section => 
+        section.events.some(event => event.id === editedEvent.id)
+      );
+      
+      if (originalSection) {
+        originalSection.events = originalSection.events.filter(
+          event => event.id !== editedEvent.id
+        );
+      }
+      
+      // Find the target section (may be different if day was changed)
+      const targetSection = newData.sections.find(section => 
+        section.day === editedEvent.daySection
+      );
+      
+      if (targetSection) {
+        // Add the edited event to the target section
+        targetSection.events.push({
+          ...editedEvent,
+          confidence: editedEvent.confidence || 0.8
+        });
+        
+        // Sort events in the target section by time
+        targetSection.events.sort((a, b) => {
+          const timeA = a.hasTimeRange ? a.startTime : a.time;
+          const timeB = b.hasTimeRange ? b.startTime : b.time;
+          return compareEventTimes(timeA, timeB);
+        });
+      }
+      
+      return newData;
+    });
+  };
+
+  const handleDeleteEvent = (eventToDelete) => {
+    console.log('Deleting event:', eventToDelete);
+    
+    setExtractedData(prevData => {
+      const newData = { ...prevData };
+      
+      // Find the section containing the event and remove it
+      newData.sections = newData.sections.map(section => ({
+        ...section,
+        events: section.events.filter(event => event.id !== eventToDelete.id)
+      }));
+      
+      return newData;
+    });
+  };
+
   const getTotalEvents = () => {
     if (!extractedData?.sections) return 0;
     return extractedData.sections.reduce((total, section) => 
@@ -99,6 +188,30 @@ export default function App() {
       );
     }
     return <Text style={styles.eventTime}>{event.time}</Text>;
+  };
+
+  // Helper function to compare event times for sorting
+  const compareEventTimes = (time1, time2) => {
+    return parseTimeString(time1) - parseTimeString(time2);
+  };
+
+  const parseTimeString = (timeStr) => {
+    if (!timeStr) return 0;
+
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+    if (!match) return 0;
+
+    let [_, hours, minutes, meridian] = match;
+    hours = parseInt(hours);
+    minutes = parseInt(minutes);
+
+    if (meridian.toLowerCase() === 'pm' && hours !== 12) {
+      hours += 12;
+    } else if (meridian.toLowerCase() === 'am' && hours === 12) {
+      hours = 0;
+    }
+
+    return hours * 60 + minutes;
   };
 
   // CloudScribble Branded Button Component
@@ -174,14 +287,31 @@ export default function App() {
               {section.day}
             </Text>
             {section.events.map((event, eventIndex) => (
-              <View key={eventIndex} style={styles.eventItem}>
-                {renderEventTime(event)}
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                <Text style={styles.eventConfidence}>
-                  Confidence: {(event.confidence * 100).toFixed(1)}%
-                </Text>
+              <View key={event.id || eventIndex} style={styles.eventItem}>
+                <View style={styles.eventContent}>
+                  <View style={styles.eventDetails}>
+                    {renderEventTime(event)}
+                    <Text style={styles.eventTitle}>{event.title}</Text>
+                    <Text style={styles.eventConfidence}>
+                      Confidence: {(event.confidence * 100).toFixed(1)}%
+                    </Text>
+                  </View>
+                  <View style={styles.eventActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => handleEditEvent(event, section)}
+                    >
+                      <Text style={styles.actionIcon}>✏️</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
             ))}
+            {section.events.length === 0 && (
+              <View style={styles.noEventsContainer}>
+                <Text style={styles.noEventsText}>No events found for this day</Text>
+              </View>
+            )}
           </View>
         ))}
 
@@ -261,6 +391,10 @@ export default function App() {
                 <Text style={styles.featureText}>AI extracts events automatically</Text>
               </View>
               <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>✏️</Text>
+                <Text style={styles.featureText}>Edit and refine events as needed</Text>
+              </View>
+              <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>📅</Text>
                 <Text style={styles.featureText}>Sync to the calendar of your choice</Text>
               </View>
@@ -292,6 +426,25 @@ export default function App() {
           }))
         ) || []}
       />
+
+      {/* Edit Event Modal */}
+      <EditEvent
+        isVisible={showEditEvent}
+        onClose={() => {
+          setShowEditEvent(false);
+          setEditingEvent(null);
+          setEditingEventSection(null);
+        }}
+        event={editingEvent}
+        availableDays={extractedData?.sections?.map(section => ({
+          day: section.day,
+          shortDay: section.shortDay || section.day.substring(0, 3),
+          date: section.date,
+          month: section.month
+        })) || []}
+        onSave={handleSaveEvent}
+        onDelete={handleDeleteEvent}
+      />
     </SafeAreaView>
   );
 }
@@ -299,7 +452,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BackgroundColors.main, // CloudScribble cream
+    backgroundColor: BackgroundColors.main,
   },
   appHeader: {
     backgroundColor: Colors.navy,
@@ -338,14 +491,14 @@ const styles = StyleSheet.create({
   welcomeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: TextColors.primary, // Navy
+    color: TextColors.primary,
     marginBottom: 15,
     textAlign: 'center',
   },
   instructionText: {
     fontSize: 16,
     textAlign: 'center',
-    color: TextColors.secondary, // Warm gray
+    color: TextColors.secondary,
     lineHeight: 24,
     paddingHorizontal: 10,
   },
@@ -460,7 +613,6 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: BackgroundColors.card,
-    padding: 15,
     marginBottom: 10,
     borderRadius: 10,
     borderLeftWidth: 4,
@@ -470,6 +622,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+  },
+  eventContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  eventDetails: {
+    flex: 1,
+    padding: 15,
+  },
+  eventActions: {
+    paddingRight: 15,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.lavender,
+    borderWidth: 1,
+    borderColor: Colors.mauve,
+  },
+  actionIcon: {
+    fontSize: 20,
   },
   eventTime: {
     fontSize: 16,
@@ -487,6 +660,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.warmGray,
     marginTop: 4,
+  },
+  noEventsContainer: {
+    padding: 20,
+    alignItems: 'center',
+    backgroundColor: Colors.sageOverlay,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.sage,
+  },
+  noEventsText: {
+    fontSize: 14,
+    color: TextColors.secondary,
+    fontStyle: 'italic',
   },
   metadataContainer: {
     marginTop: 20,
@@ -507,7 +693,6 @@ const styles = StyleSheet.create({
     marginTop: 30,
     gap: 15,
   },
-  // CloudScribble Button Styles
   cloudscribbleButton: {
     paddingVertical: 14,
     paddingHorizontal: 24,
@@ -522,9 +707,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   buttonContent: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonIcon: {
     width: 40,
@@ -536,4 +721,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-}); 
+});
