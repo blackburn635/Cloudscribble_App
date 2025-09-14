@@ -586,3 +586,50 @@ The CloudScribble app now includes comprehensive calendar synchronization that i
 7. **Action** → Delete from calendar or write in paper planner
 8. **Complete** → View write-in-planner reminders on main screen
 
+
+## Things to Do/Reminders Feature (In Progress - September 2025)
+
+### 🚧 Feature Branch: todo-reminders-integration
+
+#### Implementation Status: PARTIALLY COMPLETE (70%)
+Feature postponed pre-launch for time considerations. Will be released as optional feature post-launch.
+
+#### Completed Components:
+- ✅ **PlannerTextProcessor.js** - Enhanced with todo extraction logic
+- ✅ **QRDecoder.js** - Column layout definitions (50/50 split)
+- ✅ **TodoReview.js** - Complete review/edit modal component
+- ✅ **ReminderSelector.js** - iOS reminder list selection interface
+- ✅ **RemindersManager.js** - Full EventKit integration for reminders
+- ✅ **RemindersPermission.js** - Permission handling utility
+- ✅ **App.js** - Integration code and state management
+
+#### Known Issues:
+- ❌ **Section vertical range detection** - Todos not being assigned to correct day sections
+- ❌ **Calendar sync flow** - Returns to calendar selector after orphaned event handling
+- ⚠️ **OCR block processing** - Need to verify section boundaries cover full page height
+
+#### Technical Architecture:
+```
+Page Layout (Template 01):
+├── Left 50%: Calendar Events
+└── Right 50%: Things to Do
+    ├── Flexible text recognition (bullets, checkboxes, plain text)
+    ├── 5pm COB reminder scheduling
+    └── Duplicate detection
+```
+
+#### Data Flow:
+1. Single Azure OCR API call → Extracts both events and todos
+2. Events processed → Calendar sync flow (existing)
+3. Todos extracted → Review modal → Reminder list selection → Create at 5pm
+
+#### Future Implementation Notes:
+- **Make feature optional**: Add settings toggle in app preferences
+- **Fix section boundaries**: Ensure all sections have proper bottomPosition values
+- **Debug extraction**: "Take out Trash" detected but not extracted - check vertical ranges
+- **Test with multiple templates**: Currently only Template 01 configured
+
+#### Dependencies Added:
+- expo-calendar (for EventKit Reminders integration)
+- iOS permissions: NSRemindersUsageDescription
+

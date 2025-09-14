@@ -34,30 +34,17 @@ export class PlannerTextProcessor {
       // Step 1: Process OCR (single API call)
       const ocrResult = await this.azureClient.recognizeText(this.imageUri);
 
-      //Debugging code
-      console.log('OCR Result structure:', JSON.stringify(ocrResult, null, 2));
-      console.log('OCR Result keys:', Object.keys(ocrResult || {}));
-      console.log('Success:', ocrResult?.success);
-      console.log('Data length:', ocrResult?.data?.length);
-      console.log('Blocks present:', !!ocrResult?.blocks);
-
       if (!ocrResult || !ocrResult.success || !ocrResult.data) {
         throw new Error('OCR processing failed or returned no data');
       }
 
       console.log('OCR processing complete, found', ocrResult.data.length, 'text blocks');
 
-      // Step 2: Extract QR code from existing OCR results (NO ADDITIONAL API CALL)
+      // Step 2: Extract QR code from existing OCR results
       this.qrData = this.qrDecoder.processQRFromOCRResults(ocrResult, this.screenWidth);
       
       if (this.qrData) {
-        console.log('QR code detected in OCR results:', {
-          template: this.qrData.templateCode,
-          pageType: this.qrData.isLeftPage ? 'left' : 'right',
-          startDate: this.qrData.startDate,
-          daysOnPage: this.qrData.daysOnPage
-        });
-        
+        console.log('QR code detected in OCR results');
         // Add QR metadata
         this.recognized.metadata.qrData = this.qrData;
         this.recognized.metadata.templateCode = this.qrData.templateCode;
@@ -71,6 +58,9 @@ export class PlannerTextProcessor {
         await this.processFallback(ocrResult);
       }
 
+      // Step 3: Process Things to Do items - FIX: Pass ocrResult.data
+      await this.processTodosForSections(ocrResult.data);  // ← FIXED
+
       this.calculateConfidence();
       return { 
         success: true, 
@@ -83,6 +73,155 @@ export class PlannerTextProcessor {
       console.error('Page processing failed:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * Process Things to Do items for each section (NEW)
+   */
+  async processTodosForSections(ocrResult) {
+    console.log('Processing Things to Do items...');
+    
+    // Get image width from OCR results
+    const imageWidth = Math.max(...ocrResult.data.map(b => b.bounding?.right || 0));
+    
+    for (const section of this.recognized.sections) {
+      section.todos = [];
+      const todoBlocks = this.findTodoBlocks(section, ocrResult.data, imageWidth);
+      
+      for (const block of todoBlocks) {
+        const todos = this.extractTodosFromBlock(block, section);
+        section.todos.push(...todos);
+      }
+      
+      console.log(`Found ${section.todos.length} todos for ${section.day}`);
+    }
+  }
+
+  /**
+   * Find blocks in the Things to Do column (right 50%) (NEW)
+   */
+  findTodoBlocks(section, blocks, imageWidth) {
+    const todoBlocks = [];
+    
+    for (const block of blocks) {
+      if (!block.bounding || !block.text) continue;
+      
+      // Check if block is in the right 50% (Things to Do column)
+      const blockCenter = (block.bounding.left + block.bounding.right) / 2;
+      const isRightColumn = blockCenter > (imageWidth * 0.5);
+      
+      // Check if block is in this section's vertical range
+      const isInSection = this.isBlockInSectionRange(block, section);
+      
+      // Skip headers and QR codes
+      const isHeader = /things to do/i.test(block.text);
+      
+      if (isRightColumn && isInSection && !isHeader && !this.isQRCodeBlock(block)) {
+        todoBlocks.push(block);
+      }
+    }
+    
+    return todoBlocks;
+  }
+
+  /**
+   * Check if block is within section's vertical range (NEW)
+   */
+  isBlockInSectionRange(block, section) {
+    if (!block.bounding?.top) return false;
+    
+    // If section has bottomPosition, use it
+    if (section.bottomPosition !== undefined) {
+      return block.bounding.top >= section.topPosition && 
+             block.bounding.top < section.bottomPosition;
+    }
+    
+    // Otherwise, find the next section and use its top as boundary
+    const sortedSections = [...this.recognized.sections]
+      .sort((a, b) => a.topPosition - b.topPosition);
+    
+    const sectionIndex = sortedSections.findIndex(s => s.day === section.day);
+    const nextSection = sortedSections[sectionIndex + 1];
+    
+    if (nextSection) {
+      return block.bounding.top >= section.topPosition && 
+             block.bounding.top < nextSection.topPosition;
+    }
+    
+    // Last section - everything below it
+    return block.bounding.top >= section.topPosition;
+  }
+
+  /**
+   * Extract individual todo items from a block (NEW)
+   */
+  extractTodosFromBlock(block, section) {
+    const todos = [];
+    const text = block.text.trim();
+    
+    // Split by common delimiters while preserving format
+    const lines = text.split(/\n|\r/).filter(line => line.trim());
+    
+    for (const line of lines) {
+      const cleanedText = this.cleanTodoText(line);
+      if (cleanedText && this.isValidTodo(cleanedText)) {
+        todos.push({
+          id: `todo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          text: cleanedText,
+          originalText: line,
+          dayDate: section.date,
+          dayName: section.day,
+          reminderTime: '17:00', // 5pm COB
+          confidence: block.confidence || 0.8,
+          bounds: block.bounding
+        });
+      }
+    }
+    
+    return todos;
+  }
+
+  /**
+   * Clean todo text by removing bullets, checkboxes, numbers (NEW)
+   */
+  cleanTodoText(text) {
+    let cleaned = text.trim();
+    
+    // Remove common todo markers
+    cleaned = cleaned.replace(/^[-•◦▪▫◯☐☑✓✗×]\s*/g, ''); // Bullets and checkboxes
+    cleaned = cleaned.replace(/^\d+[\.)]\s*/g, '');      // Numbered lists
+    cleaned = cleaned.replace(/^[a-z][\.)]\s*/gi, '');   // Lettered lists
+    
+    return cleaned.trim();
+  }
+
+  /**
+   * Validate if text is a valid todo item (NEW)
+   */
+  isValidTodo(text) {
+    // Filter out invalid todos
+    if (!text || text.length < 2) return false;
+    if (/^[\d\W]+$/.test(text)) return false; // Only numbers/symbols
+    if (this.isDayName(text)) return false;
+    if (this.isDateText(text)) return false;
+    
+    return true;
+  }
+
+  /**
+   * Check if text is a day name (NEW)
+   */
+  isDayName(text) {
+    return /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)$/i.test(text);
+  }
+
+  /**
+   * Check if text is a date (NEW)
+   */
+  isDateText(text) {
+    return /^\d{1,2}\/\d{1,2}$/.test(text) || 
+           /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)/i.test(text) ||
+           /^\d{4}$/.test(text);
   }
 
   /**
@@ -111,6 +250,7 @@ export class PlannerTextProcessor {
         shortDay: dayInfo.shortName,
         date: dayInfo.date,
         events: [],
+        todos: [], // Initialize todos array
         topPosition,
         bottomPosition,
         confidence: 0.8
@@ -164,6 +304,7 @@ export class PlannerTextProcessor {
           date: parsedDate ? parsedDate.date : null,
           year: currentYear,
           events: [],
+          todos: [], // Initialize todos array
           topPosition: block.bounding.top,
           confidence: block.confidence || 0.8
         };
@@ -558,6 +699,31 @@ export class PlannerTextProcessor {
     return hours * 60 + minutes;
   }
 
+  async processTodosForSections(blocks) {  // Changed from ocrResult to blocks
+  console.log('Processing Things to Do items...');
+  
+  // Get image width from blocks
+  const imageWidth = Math.max(...blocks.map(b => b.bounding?.right || 0));
+    console.log('Image width calculated as:', imageWidth);
+    console.log('Number of sections:', this.recognized.sections.length);
+    
+    for (const section of this.recognized.sections) {
+      console.log(`Processing todos for ${section.day}`);
+      section.todos = [];
+      const todoBlocks = this.findTodoBlocks(section, blocks, imageWidth);  // Pass blocks directly
+      
+      console.log(`Found ${todoBlocks.length} potential todo blocks for ${section.day}`);
+      
+      for (const block of todoBlocks) {
+        console.log(`Processing block: "${block.text}" at position ${block.bounding.left}`);
+        const todos = this.extractTodosFromBlock(block, section);
+        section.todos.push(...todos);
+      }
+      
+      console.log(`Total todos for ${section.day}: ${section.todos.length}`);
+    }
+  }
+
   /**
    * Calculate overall processing confidence
    */
@@ -570,14 +736,21 @@ export class PlannerTextProcessor {
     const totalEvents = this.recognized.sections.reduce((sum, section) => 
       sum + section.events.length, 0);
     
-    if (totalEvents === 0) {
+    const totalTodos = this.recognized.sections.reduce((sum, section) => 
+      sum + (section.todos?.length || 0), 0);
+    
+    if (totalEvents === 0 && totalTodos === 0) {
       this.recognized.metadata.totalConfidence = 0.3;
       return;
     }
 
     const avgEventConfidence = this.recognized.sections.reduce((sum, section) => {
-      const sectionConfidence = section.events.reduce((eventSum, event) => 
+      const eventConfidence = section.events.reduce((eventSum, event) => 
         eventSum + event.confidence, 0) / (section.events.length || 1);
+      const todoConfidence = (section.todos?.reduce((todoSum, todo) => 
+        todoSum + todo.confidence, 0) || 0) / (section.todos?.length || 1);
+      
+      const sectionConfidence = (eventConfidence + todoConfidence) / 2;
       return sum + sectionConfidence;
     }, 0) / this.recognized.sections.length;
 

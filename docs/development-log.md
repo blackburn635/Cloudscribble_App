@@ -841,3 +841,67 @@ parseDateFromText(text) {
 - **Error Rate:** 0% with proper permission handling
 - **User Success:** Clear actions reduce confusion
 
+
+### Phase 14: Things to Do/Reminders Integration (Partial)
+**Objective:** Extract Things to Do items and create iOS Reminders
+**Date:** September 2025
+**Status:** POSTPONED - Feature branch created for post-launch implementation
+
+**Work Completed:**
+
+#### Architecture Design
+- Designed 50/50 column split detection (calendar left, todos right)
+- Single API transaction maintained for cost optimization
+- 5pm COB scheduling for all reminders
+- Flexible text extraction (bullets, checkboxes, numbers, plain text)
+
+#### Components Created
+1. **TodoReview.js** - Full-featured review/edit modal
+   - Checkbox selection per todo
+   - Inline text editing
+   - Delete functionality
+   - Day grouping
+
+2. **ReminderSelector.js** - List selection interface
+   - Defaults to "General Reminders"
+   - Color-coded list display
+   - Permission handling
+
+3. **RemindersManager.js** - EventKit integration
+   - Batch reminder creation
+   - Duplicate detection
+   - Error handling per reminder
+
+#### Files Modified
+- **PlannerTextProcessor.js**: Added `processTodosForSections()`, `findTodoBlocks()`, `extractTodosFromBlock()`
+- **QRDecoder.js**: Added column layout to template definitions
+- **App.js**: Integrated todo flow with state management
+
+#### Issues Encountered
+1. **Section Boundary Problem**: Todos detected by OCR but not assigned to sections
+   - Root cause: Section vertical ranges not covering full page height
+   - Debug showed "Take out Trash" at position 2133 outside section ranges
+   
+2. **Data Structure Mismatch**: Initial implementation passed wrong object structure
+   - Fixed: Changed `processTodosForSections(ocrResult)` to `processTodosForSections(ocrResult.data)`
+
+3. **Calendar Sync Loop**: After orphaned event handling, returns to calendar selector
+   - Need to fix CalendarSelector component flow
+
+#### Lessons Learned
+- **Vertical Range Coverage**: Must ensure sections extend to page boundaries
+- **Debug Early**: Should have added comprehensive logging from start
+- **Feature Flags**: Complex features should be optional from design phase
+- **Integration Testing**: Need test data with known positions for debugging
+
+#### Code Quality Notes
+- All components follow CloudScribble design system
+- Maintains single API transaction optimization
+- Proper error handling and user feedback
+- Clean separation of concerns
+
+#### Time Investment
+- ~8 hours design and implementation
+- ~2 hours debugging section detection
+- Decision to postpone based on pre-launch timeline priorities
+

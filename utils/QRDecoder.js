@@ -12,7 +12,12 @@ export class QRDecoder {
         name: 'Standard Weekly',
         leftPageDays: 4,  // Monday-Thursday
         rightPageDays: 3, // Friday-Sunday
-        sections: ['calendar', 'todos']
+        sections: ['calendar', 'todos'],
+        // NEW: Column layout information
+        columnLayout: {
+          calendar: { start: 0, end: 50 },    // Left 50%
+          todos: { start: 50, end: 100 }      // Right 50%
+        }
       }
     };
   }
@@ -178,6 +183,7 @@ export class QRDecoder {
         day,
         daysOnPage: isLeftPage ? template.leftPageDays : template.rightPageDays,
         sections: template.sections,
+        columnLayout: template.columnLayout, // Include column layout info
         raw: cleanString
       };
 
@@ -245,5 +251,12 @@ export class QRDecoder {
       dayName: dayNames[date.getDay()],
       shortName: dayNames[date.getDay()].substring(0, 3)
     }));
+  }
+
+  /**
+   * Get template definition for a template code (NEW)
+   */
+  getTemplateDefinition(templateCode) {
+    return this.templateFormats[templateCode] || null;
   }
 }

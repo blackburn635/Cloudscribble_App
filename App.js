@@ -30,6 +30,12 @@ import { PlannerTextProcessor } from './utils/PlannerTextProcessor';
 import CalendarSelector from './components/CalendarSelector';
 import EditEvent from './components/EditEvent';
 
+// NEW IMPORTS FOR TODO/REMINDERS
+import TodoReview from './components/TodoReview';
+import ReminderSelector from './components/ReminderSelector';
+import RemindersManager from './utils/RemindersManager';
+import { requestRemindersPermission } from './utils/RemindersPermission';
+
 export default function App() {
   const [showCamera, setShowCamera] = useState(false);
   const [capturedImage, setCapturedImage] = useState(null);
@@ -42,8 +48,14 @@ export default function App() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [editingEventSection, setEditingEventSection] = useState(null);
   
-  // Calendar Sync State - NEW
+  // Calendar Sync State
   const [writeInPlannerEvents, setWriteInPlannerEvents] = useState([]);
+  
+  // NEW TODO/REMINDERS STATE
+  const [showTodoReview, setShowTodoReview] = useState(false);
+  const [showReminderSelector, setShowReminderSelector] = useState(false);
+  const [extractedTodos, setExtractedTodos] = useState(null);
+  const [selectedTodos, setSelectedTodos] = useState(null);
 
   useEffect(() => {
     console.log('CloudScribble App is starting up...');
@@ -74,7 +86,12 @@ export default function App() {
             setShowEditEvent(false);
             setEditingEvent(null);
             setEditingEventSection(null);
-            setWriteInPlannerEvents([]); // Clear write-in-planner events
+            setWriteInPlannerEvents([]);
+            // Reset todo states
+            setShowTodoReview(false);
+            setShowReminderSelector(false);
+            setExtractedTodos(null);
+            setSelectedTodos(null);
           }
         }
       ]
@@ -86,6 +103,7 @@ export default function App() {
     setShowCamera(false);
   };
 
+  // UPDATED processImage function to handle todos
   const processImage = async () => {
     if (!capturedImage) return;
 
@@ -99,7 +117,7 @@ export default function App() {
       if (result.success) {
         console.log('Text processing successful:', result.data);
         
-        // Add unique IDs and day section references to events
+        // Add unique IDs and day section references to events and todos
         const processedData = {
           ...result.data,
           sections: result.data.sections.map(section => ({
@@ -109,11 +127,13 @@ export default function App() {
               id: `${section.day}-${index}-${Date.now()}`,
               daySection: section.day,
               date: section.date
-            }))
+            })),
+            todos: section.todos || [] // Ensure todos array exists
           }))
         };
         
         setExtractedData(processedData);
+        setExtractedTodos(processedData.sections); // Store sections with todos
       } else {
         throw new Error(result.error || 'Text processing failed');
       }
@@ -135,6 +155,7 @@ export default function App() {
   const handleRetake = () => {
     setCapturedImage(null);
     setExtractedData(null);
+    setExtractedTodos(null);
     setShowCamera(true);
   };
 
@@ -206,13 +227,12 @@ export default function App() {
     });
   };
   
-  // NEW: Handle write-in-planner events from Calendar Sync
+  // Handle write-in-planner events from Calendar Sync
   const handleWriteInPlannerEvents = (events) => {
     setWriteInPlannerEvents(events);
-    // Optionally show a notification or badge
   };
   
-  // NEW: Format event date for display
+  // Format event date for display
   const formatCalendarEventDate = (event) => {
     const date = new Date(event.startDate);
     const dayOptions = { weekday: 'long' };
@@ -222,7 +242,7 @@ export default function App() {
     return `${dayOfWeek}, ${fullDate}`;
   };
 
-  // NEW: Format event time for display
+  // Format event time for display
   const formatCalendarEventTime = (event) => {
     const date = new Date(event.startDate);
     const hours = date.getHours();
@@ -236,10 +256,109 @@ export default function App() {
     return `${displayHours}:${minutes.toString().padStart(2, '0')}${meridian}`;
   };
 
+  // NEW TODO/REMINDERS FUNCTIONS
+  const checkAndShowTodos = (sections) => {
+    const hasTodos = sections.some(s => s.todos && s.todos.length > 0);
+    if (hasTodos) {
+      console.log('Found todos, showing review screen');
+      setShowTodoReview(true);
+    } else {
+      console.log('No todos found to review');
+    }
+  };
+
+  const handleTodoReviewConfirm = async (todos) => {
+    console.log(`Confirmed ${todos.length} todos for reminder creation`);
+    setSelectedTodos(todos);
+    setShowTodoReview(false);
+    
+    // Request reminders permission
+    const hasPermission = await requestRemindersPermission();
+    if (hasPermission) {
+      setShowReminderSelector(true);
+    }
+  };
+
+  const handleTodoReviewCancel = () => {
+    setShowTodoReview(false);
+    setSelectedTodos(null);
+  };
+
+  const handleReminderListSelect = async (list) => {
+    setShowReminderSelector(false);
+    
+    try {
+      setIsProcessing(true);
+      
+      // Group todos by day for processing
+      const todosByDay = {};
+      selectedTodos.forEach(todo => {
+        const key = `${todo.dayName}-${todo.dayDate}`;
+        if (!todosByDay[key]) {
+          todosByDay[key] = {
+            date: todo.dayDate,
+            dayName: todo.dayName,
+            todos: []
+          };
+        }
+        todosByDay[key].todos.push(todo);
+      });
+
+      // Create reminders for each day
+      let totalCreated = 0;
+      let totalDuplicates = 0;
+      let totalErrors = 0;
+      
+      for (const dateInfo of Object.values(todosByDay)) {
+        const results = await RemindersManager.createReminders(
+          dateInfo.todos,
+          list.id,
+          dateInfo
+        );
+        totalCreated += results.created.length;
+        totalDuplicates += results.duplicates.length;
+        totalErrors += results.errors.length;
+      }
+
+      // Show success message
+      let message = `${totalCreated} reminder${totalCreated !== 1 ? 's' : ''} created`;
+      if (totalDuplicates > 0) {
+        message += `\n${totalDuplicates} duplicate${totalDuplicates !== 1 ? 's' : ''} skipped`;
+      }
+      if (totalErrors > 0) {
+        message += `\n${totalErrors} error${totalErrors !== 1 ? 's' : ''} occurred`;
+      }
+      
+      Alert.alert('Reminders Saved', message);
+      
+      // Reset state
+      setSelectedTodos(null);
+      setExtractedTodos(null);
+      
+    } catch (error) {
+      Alert.alert('Error', `Failed to create reminders: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleReminderSelectorCancel = () => {
+    setShowReminderSelector(false);
+    setSelectedTodos(null);
+  };
+
   const getTotalEvents = () => {
     if (!extractedData?.sections) return 0;
     return extractedData.sections.reduce((total, section) => 
       total + (section.events?.length || 0), 0
+    );
+  };
+
+  // NEW: Get total todos count
+  const getTotalTodos = () => {
+    if (!extractedData?.sections) return 0;
+    return extractedData.sections.reduce((total, section) => 
+      total + (section.todos?.length || 0), 0
     );
   };
 
@@ -366,9 +485,10 @@ export default function App() {
 
         <Text style={styles.dataHeader}>
           Extracted Events ({getTotalEvents()})
+          {getTotalTodos() > 0 && ` • ${getTotalTodos()} Tasks`}
         </Text>
         
-        {/* NEW: Write-in-planner reminder section */}
+        {/* Write-in-planner reminder section */}
         {writeInPlannerEvents.length > 0 && (
           <View style={styles.writeInPlannerReminder}>
             <Text style={styles.reminderTitle}>📝 Write in Planner:</Text>
@@ -417,6 +537,18 @@ export default function App() {
             {section.events.length === 0 && (
               <View style={styles.noEventsContainer}>
                 <Text style={styles.noEventsText}>No events detected for this day</Text>
+              </View>
+            )}
+            
+            {/* NEW: Display todos for this section */}
+            {section.todos && section.todos.length > 0 && (
+              <View style={styles.todosContainer}>
+                <Text style={styles.todosHeader}>Things to Do:</Text>
+                {section.todos.map((todo, index) => (
+                  <View key={todo.id || index} style={styles.todoItemDisplay}>
+                    <Text style={styles.todoText}>• {todo.text}</Text>
+                  </View>
+                ))}
               </View>
             )}
           </View>
@@ -478,11 +610,20 @@ export default function App() {
                 type="secondary"
               />
               {extractedData && !isProcessing && (
-                <CloudScribbleButton 
-                  title="Save to Calendar" 
-                  onPress={() => setShowCalendarSelector(true)}
-                  type="success"
-                />
+                <>
+                  <CloudScribbleButton 
+                    title="Save to Calendar" 
+                    onPress={() => setShowCalendarSelector(true)}
+                    type="success"
+                  />
+                  {getTotalTodos() > 0 && (
+                    <CloudScribbleButton 
+                      title="Review Tasks" 
+                      onPress={() => setShowTodoReview(true)}
+                      type="primary"
+                    />
+                  )}
+                </>
               )}
             </View>
           </View>
@@ -510,7 +651,7 @@ export default function App() {
               </View>
               <View style={styles.featureItem}>
                 <Text style={styles.featureIcon}>📅</Text>
-                <Text style={styles.featureText}>Sync to the your calendar</Text>
+                <Text style={styles.featureText}>Sync to your calendar</Text>
               </View>
             </View>
 
@@ -526,7 +667,13 @@ export default function App() {
 
       <CalendarSelector
         isVisible={showCalendarSelector}
-        onClose={() => setShowCalendarSelector(false)}
+        onClose={() => {
+          setShowCalendarSelector(false);
+          // Check for todos after calendar import
+          if (extractedTodos) {
+            checkAndShowTodos(extractedTodos);
+          }
+        }}
         events={extractedData?.sections?.flatMap(section => 
           section.events.map(event => ({
             ...event,
@@ -538,7 +685,14 @@ export default function App() {
             timezone: extractedData.metadata.timezone
           }))
         ) || []}
-        onWriteInPlannerEvents={handleWriteInPlannerEvents}
+        onWriteInPlannerEvents={(events) => {
+          handleWriteInPlannerEvents(events);
+          setShowCalendarSelector(false);  // Close calendar selector
+          // Check for todos after handling write-in events
+          if (extractedTodos) {
+            checkAndShowTodos(extractedTodos);
+          }
+        }}
       />
 
       <EditEvent
@@ -558,19 +712,28 @@ export default function App() {
         onSave={handleSaveEvent}
         onDelete={handleDeleteEvent}
       />
+
+      {/* NEW: Todo Review Modal */}
+      {showTodoReview && (
+        <TodoReview
+          visible={showTodoReview}
+          todos={extractedTodos}
+          onConfirm={handleTodoReviewConfirm}
+          onCancel={handleTodoReviewCancel}
+        />
+      )}
+
+      {/* NEW: Reminder Selector Modal */}
+      {showReminderSelector && (
+        <ReminderSelector
+          visible={showReminderSelector}
+          onSelect={handleReminderListSelect}
+          onCancel={handleReminderSelectorCancel}
+        />
+      )}
     </SafeAreaView>
   );
 }
-
-// ADD THIS FUNCTION
-const formatCalendarEventDate = (event) => {
-  const date = new Date(event.startDate);
-  const dayOptions = { weekday: 'long' };
-  const dateOptions = { month: 'long', day: 'numeric', year: 'numeric' };
-  const dayOfWeek = date.toLocaleDateString('en-US', dayOptions);
-  const fullDate = date.toLocaleDateString('en-US', dateOptions);
-  return `${dayOfWeek}, ${fullDate}`;
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -724,7 +887,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center',
   },
-  // NEW: Write-in-planner reminder styles
+  // Write-in-planner reminder styles
   writeInPlannerReminder: {
     backgroundColor: '#FFF8DC',
     borderRadius: 12,
@@ -850,6 +1013,26 @@ const styles = StyleSheet.create({
     color: TextColors.secondary,
     fontStyle: 'italic',
   },
+  // NEW: Todo display styles
+  todosContainer: {
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: Colors.lavender,
+    borderRadius: 8,
+  },
+  todosHeader: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.navy,
+    marginBottom: 8,
+  },
+  todoItemDisplay: {
+    marginBottom: 5,
+  },
+  todoText: {
+    fontSize: 14,
+    color: TextColors.primary,
+  },
   metadataContainer: {
     marginTop: 20,
     padding: 15,
@@ -868,6 +1051,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginTop: 30,
     gap: 15,
+    flexWrap: 'wrap',
+    paddingHorizontal: 20,
   },
   cloudscribbleButton: {
     paddingVertical: 14,

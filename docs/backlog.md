@@ -124,3 +124,43 @@
 - [ ] **UX-004:** Improve animation smoothness
 - [ ] **UX-005:** Add dark mode support
 
+
+## High Priority (Post-Launch)
+
+### Complete Things to Do/Reminders Integration
+**Branch:** todo-reminders-integration
+**Estimated Time:** 4-6 hours
+**Tasks:**
+- [ ] Fix section vertical range detection
+  - Ensure all sections have bottomPosition set
+  - Verify sections cover full page height
+  - Test with "Take out Trash" at position 2133
+- [ ] Fix calendar sync flow to prevent loop
+- [ ] Add feature toggle in app settings
+- [ ] Comprehensive testing with multiple page layouts
+- [ ] Add telemetry for extraction success rates
+- [ ] Create user onboarding for feature
+
+**Technical Debt:**
+- Refactor section boundary calculation into dedicated method
+- Add unit tests for todo extraction logic
+- Consider extracting todo processing into separate class
+
+**User Experience:**
+- Add tutorial overlay on first use
+- Show extraction confidence for todos
+- Allow manual todo addition in review modal
+- Add time customization (not just 5pm)
+
+## Completed Tasks
+
+### ✅ Calendar Sync Feature (December 2024)
+- Orphaned event detection
+- Write-in-planner reminders
+- Dual action system (Delete/Write)
+
+### ✅ Edit Event Feature (September 12, 2025)
+- Complete CRUD operations
+- Day movement between sections
+- Time picker implementation
+
